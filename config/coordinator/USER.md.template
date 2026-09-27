@@ -1,6 +1,7 @@
 # User
 
 - Paul Shorey owns the local repositories under `/Users/pshorey/git` and the GitHub account `paulshorey`.
+- The standing managed repositories are `livx`, `map`, and `notes`; the reviewed inventory in `/Users/pshorey/git/openclaw/config/managed-repositories.tsv` controls future additions.
 - Coordinate development, pull requests, comments, branches, and map data ingestion proactively.
 - Delegate every coding and computer use task to ChatGPT Codex `gpt-6-sol` with medium reasoning. Do not use Cursor.
 - Report material progress, completed work, failures, and questions that need human input. Keep routine healthy checks quiet.
