@@ -16,7 +16,7 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 
 ## Secrets
 
-- `~/.openclaw/.env` (mode `0600`): `FIREWORKS_API_KEY`, `TELEGRAM_BOT_TOKEN`
+- `~/.openclaw/.env` (mode `0600`): `FIREWORKS_API_KEY`, `TELEGRAM_BOT_TOKEN` (after Telegram setup)
 - Never in Git, config, or prompts. Rotate at Fireworks if exposed.
 - `env.shellEnv.enabled: true` → imports missing expected keys from login shell (`~/.zprofile` → `~/.shortcuts.sh` → `~/.secrets.sh`). See [environment precedence](https://docs.openclaw.ai/help/environment).
 
@@ -31,7 +31,7 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 | `scripts/delegate-codex.sh`                                          | Runs Codex Sol in a repo with project env; logs to `logs/`                                   |
 | `scripts/project-env.py`, `requirements.txt`                         | Project-scoped env runner + its dependency                                                   |
 | `scripts/status.sh`                                                  | Read-only Gateway/auth/PR/ingestion snapshot                                                 |
-| `scripts/start-telegram-pairing.sh`, `scripts/configure-telegram.sh` | Telegram owner pairing + allowlist                                                           |
+| `scripts/start-telegram-pairing.sh`, `scripts/configure-telegram.sh`, `scripts/check-telegram-bot.py` | Telegram owner pairing, topic-mode check, and allowlist |
 
 ## OpenClaw Coordinator Files
 
@@ -90,19 +90,23 @@ openclaw cron list --all      # heartbeat schedule
 openclaw dashboard            # http://127.0.0.1:18789/
 ```
 
-- Gateway currently **stopped** (post workspace migration). Loopback only.
+- Gateway currently **running** as a LaunchAgent. Loopback only.
 - LaunchAgent runs only while logged in and awake.
-- Heartbeat: every `1h` (`agents.defaults.heartbeat.every`); lives in the scheduler, no `HEARTBEAT.md`.
+- Heartbeat: every `1h` (`agents.defaults.heartbeat.every`); lives in the scheduler, no `HEARTBEAT.md`. The isolated heartbeat pass sends workload updates to Telegram topics through message actions and returns `NO_REPLY` when quiet.
 - Dashboard auth is tied to the browser profile that ran `openclaw dashboard`.
 
-## Telegram (planned)
+## Telegram workload conversations
 
-1. Create bot via `@BotFather`; add `TELEGRAM_BOT_TOKEN=...` to `~/.openclaw/.env`.
-2. `./scripts/start-telegram-pairing.sh`, DM the bot, note your numeric user ID.
-3. `./scripts/configure-telegram.sh <user-id>` (owner-only DM, heartbeat alerts to owner).
-4. Verify: `openclaw channels status --probe` + test message.
+Current bot: [@PaulShoreyOpenClawBot](https://t.me/PaulShoreyOpenClawBot). Its token is in the ignored `~/.openclaw/.env`, the owner's numeric ID is configured in OpenClaw's local allowlist, BotFather private-chat topics and user-created topics are enabled, and group adds are disabled. The live Gateway probe reports Telegram connected.
 
-Alerts only for blockers, failures, decisions.
+For a new Mac or replacement bot:
+
+1. Create a bot via [@BotFather](https://t.me/BotFather). Enable **Topics/Threaded Mode** and **Allow users to create topics** for that bot. Add `TELEGRAM_BOT_TOKEN=...` to `~/.openclaw/.env` and keep the file at mode `0600`. Do not paste the token into a chat or tracked file.
+2. Run `./scripts/start-telegram-pairing.sh`, DM the bot, and note your numeric Telegram user ID from its pairing reply.
+3. Run `./scripts/configure-telegram.sh <user-id>`. This verifies BotFather's topic settings, allows only your DM, disables groups, sets your chat as the destination for explicit topic messages, and restarts the Gateway. Automatic flat-DM heartbeat delivery stays off.
+4. Verify `openclaw channels status --probe`, then send the bot a message in a newly created topic. Use `openclaw sessions --json` to confirm that the topic has a distinct session key. Send a new message from Telegram's **All Messages** view and verify that Telegram creates another topic with another session key.
+
+Each heartbeat workload uses one persistent private-chat topic. The coordinator creates it when the workload is selected, records its topic ID in `runtime/coordinator/state/`, and sends new progress and result messages to it. Reply inside that topic to continue the workload. Send from **All Messages** to start an unrelated topic and workflow. Hourly heartbeat runs are transient; topics and the task ledger preserve continuity. If Telegram topic creation or delivery fails, the coordinator records the failure and retries on the next pass.
 
 ## Delegate
 

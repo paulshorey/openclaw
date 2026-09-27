@@ -9,6 +9,7 @@ if [[ ! -f "$env_file" ]] || ! grep -q '^TELEGRAM_BOT_TOKEN=' "$env_file"; then
   echo 'Put TELEGRAM_BOT_TOKEN in ~/.openclaw/.env before starting Telegram pairing.' >&2
   exit 78
 fi
+python3 "$(dirname -- "${BASH_SOURCE[0]}")/check-telegram-bot.py"
 
 "$openclaw_bin" config set channels.telegram.enabled true
 "$openclaw_bin" config set channels.telegram.dmPolicy pairing

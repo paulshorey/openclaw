@@ -30,11 +30,7 @@ fi
 "$openclaw_bin" config set agents.entries.main.workspace "$workspace"
 "$openclaw_bin" config set agents.defaults.model.primary fireworks/accounts/fireworks/models/deepseek-v4p1-flash
 "$openclaw_bin" config set agents.defaults.heartbeat.every 1h
-if "$openclaw_bin" config get commands.ownerAllowFrom 2>/dev/null | grep -q 'telegram:'; then
-  "$openclaw_bin" config set agents.defaults.heartbeat.target owner
-else
-  "$openclaw_bin" config set agents.defaults.heartbeat.target none
-fi
+"$openclaw_bin" config set agents.defaults.heartbeat.target none
 "$openclaw_bin" config set agents.defaults.heartbeat.isolatedSession true
 "$openclaw_bin" config set agents.defaults.heartbeat.prompt "$(< "$root/config/heartbeat-prompt.txt")"
 "$openclaw_bin" config set memory.search.provider none
