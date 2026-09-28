@@ -41,7 +41,9 @@ def main() -> None:
             "accountId": None,
             "isolatedSession": True,
             "prompt": (ROOT / "config/heartbeat-prompt.txt").read_text().strip(),
-        }}},
+        }}, "entries": {"main": {"skills": json.loads(
+            (ROOT / "config/coordinator-skills.json").read_text()
+        )}}},
         "channels": {"telegram": {"enabled": False}},
         "plugins": {"entries": {"telegram": {"enabled": False}}},
     }
@@ -75,8 +77,8 @@ def main() -> None:
             print("Removed the Telegram token from the active .env; private rollback copy retained.")
         env_file.chmod(0o600)
     subprocess.run([OPENCLAW, "config", "validate"], check=True)
-    print("Dashboard heartbeat routing configured; Telegram channel and plugin disabled.")
-    print("Deploy coordinator templates, then restart the Gateway to apply the retired environment.")
+    print("Dashboard heartbeat routing and coordinator skill catalogue configured.")
+    print("Deploy coordinator templates; the Gateway reloads prompt/skill settings. Restart if its environment changed.")
 
 
 if __name__ == "__main__":

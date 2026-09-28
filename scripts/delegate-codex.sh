@@ -36,14 +36,14 @@ run_id="${stamp}-$$"
 event_log="$root/runtime/coordinator/logs/codex-${run_id}.jsonl"
 last_message="$root/runtime/coordinator/logs/codex-${run_id}.last.txt"
 
-echo "Codex Sol (medium) started: $run_id"
+echo "Codex Sol (high) started: $run_id"
 echo "Events: $event_log"
 
 set +e
 "$python_bin" "$root/scripts/project-env.py" --cwd "$repo" -- "$codex_bin" exec \
   --cd "$repo" \
   --model gpt-6-sol \
-  -c 'model_reasoning_effort="medium"' \
+  -c 'model_reasoning_effort="high"' \
   --dangerously-bypass-approvals-and-sandbox \
   --json \
   --output-last-message "$last_message" \

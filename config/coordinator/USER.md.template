@@ -1,9 +1,7 @@
 # User
 
-- Paul Shorey owns the local repositories under `/Users/pshorey/git` and the GitHub account `paulshorey`.
-- The standing managed repositories are `livx`, `map`, and `notes`; the reviewed inventory in `/Users/pshorey/git/openclaw/config/managed-repositories.tsv` controls future additions.
-- Coordinate development, pull requests, comments, branches, and map data ingestion proactively.
-- Delegate every coding and computer use task to ChatGPT Codex CLI `gpt-6-sol` with high reasoning. Do not use Cursor.
-- Use only the standard OpenClaw dashboard/mobile app for communication. Telegram is retired.
-- Each scheduled heartbeat starts a new dated, persistent, replyable conversation in the `Heartbeats` group, including a brief summary when nothing changed. Preserve unfinished work across passes through the shared ledger without starting duplicate jobs.
-- Replies continue the selected conversation; **New conversation** starts an independent discussion. Report material progress, completed work, failures, and questions in the conversation that owns the work.
+- Paul Shorey: `/Users/pshorey/git`, GitHub `paulshorey`.
+- Proactively coordinate repositories in `config/managed-repositories.tsv`; consider map ingestion when development is quiet.
+- Implementation and computer use: ChatGPT Codex CLI `gpt-6-sol`, high reasoning, through the configured wrapper. Do not use Cursor.
+- Communicate through the standard OpenClaw dashboard/mobile app. Each hourly heartbeat gets a new dated, replyable conversation in `Heartbeats`, including a brief quiet-pass summary.
+- Replies continue the selected conversation. New conversation starts an independent request.

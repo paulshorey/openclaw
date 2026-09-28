@@ -1,6 +1,6 @@
 # OpenClaw development coordinator
 
-Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Flash. Coding/computer use: Codex CLI, `gpt-6-sol`, medium reasoning. Manages the repositories listed in `config/managed-repositories.tsv`; considers `map` ingestion when development is quiet.
+Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Flash. Coding/computer use: Codex CLI, `gpt-6-sol`, high reasoning. Manages the repositories listed in `config/managed-repositories.tsv`; considers `map` ingestion when development is quiet.
 
 ## Installed
 
@@ -22,27 +22,29 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 
 ## Development Files
 
-| Path                                                                 | Purpose                                                                                      |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `AGENTS.md`                                                          | Rules for agents engineering **this repo**                                                   |
-| `config/managed-repositories.tsv`                                    | GitHub/local checkout inventory for the standing coordination queue                         |
-| `scripts/deploy-workspace.py`                                        | Templates → workspace; keeps state; refuses to overwrite changed runtime copies              |
-| `scripts/configure.sh`                                               | Applies model/workspace/heartbeat/Gateway settings, installs LaunchAgent (may start Gateway) |
-| `scripts/delegate-codex.sh`                                          | Runs Codex Sol in a repo with project env; logs to `logs/`                                   |
-| `scripts/project-env.py`, `requirements.txt`                         | Project-scoped env runner + its dependency                                                   |
-| `scripts/status.sh`                                                  | Read-only Gateway/auth/PR/ingestion snapshot                                                 |
-| `scripts/configure-ui-workflow.py`                                    | Applies dashboard heartbeat routing, disables Telegram, removes its active bot token |
+| Path                                         | Purpose                                                                                      |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `AGENTS.md`                                  | Rules for agents engineering **this repo**                                                   |
+| `config/managed-repositories.tsv`            | GitHub/local checkout inventory for the standing coordination queue                          |
+| `scripts/deploy-workspace.py`                | Templates → workspace; keeps state; refuses to overwrite changed runtime copies              |
+| `scripts/configure.sh`                       | Applies model/workspace/heartbeat/Gateway settings, installs LaunchAgent (may start Gateway) |
+| `scripts/delegate-codex.sh`                  | Runs Codex Sol in a repo with project env; logs to `logs/`                                   |
+| `scripts/project-env.py`, `requirements.txt` | Project-scoped env runner + its dependency                                                   |
+| `scripts/status.sh`                          | Read-only Gateway/auth/PR/ingestion snapshot                                                 |
+| `scripts/configure-ui-workflow.py`           | Applies dashboard heartbeat routing, disables Telegram, removes its active bot token         |
 
 ## OpenClaw Coordinator Files
 
 | Path                                      | Purpose                                                                                                   |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `config/heartbeat-prompt.txt`             | Hourly heartbeat trigger; applied by `configure.sh`                                                       |
+| `config/coordinator-skills.json`         | Small skill catalogue exposed to the coordinator; applied by `configure-ui-workflow.py`                  |
 | `config/coordinator/AGENTS.md.template`   | OpenClaw procedure: pass checklist, priorities, delegation/review, GitHub + map workflows, when to notify |
 | `config/coordinator/SOUL.md.template`     | Mission, style, autonomy, review principles (broad)                                                       |
 | `config/coordinator/IDENTITY.md.template` | Name, role, voice                                                                                         |
 | `config/coordinator/USER.md.template`     | Stable facts/preferences about Paul (no secrets, no task state)                                           |
 | `runtime/coordinator/state/`              | Private ledger: task IDs, PR URLs, decisions, blockers                                                    |
+| `runtime/coordinator/state/ACTIVE.md`     | Short index of current work, pending decisions and evidence links; updated each pass                      |
 | `runtime/coordinator/logs/`               | Codex run logs from `delegate-codex.sh`                                                                   |
 
 ## Where rules go:
@@ -52,6 +54,16 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 - Coding inside a project → that project's `AGENTS.md`
 - One-off task / run status → `runtime/coordinator/state/`
 - Edit templates, not runtime copies, then deploy. Deploy does not start the Gateway.
+
+### Context and run lifetime
+
+OpenClaw injects the runtime `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, in that order, into both the launcher and visible heartbeat session. AGENTS owns the procedure; SOUL covers role/style; USER records preferences. The heartbeat prompt only launches the conversation and selects the procedure. The coordinator then reads `state/ACTIVE.md`, the repository inventory, and relevant linked evidence. Historical state/log directories are not loaded wholesale.
+
+The built-in `[Subagent Context]` wrapper comes from OpenClaw's `buildSubagentTaskMessage` implementation. `depth 1/5` is nesting depth, not progress. `visible=true` keeps a saved, replyable conversation after its run ends. It does not keep a model or worker running indefinitely: later messages/completions start another turn. Idle conversations retain history without generating tokens. The Gateway/scheduler service remains running independently.
+
+Heartbeat passes aim for five minutes with a 15-minute hard execution limit. Required decisions are written to ACTIVE.md and asked in the final reply; dependent work stays pending until an actual answer arrives. Heartbeats do not block on `ask_user`, whose wait consumes the run budget and expires. Enable **Agent finished** notifications to see these summaries/questions; they are ordinary conversation messages, not pending question cards. Background specialist work uses completion events in its owning conversation.
+
+The coordinator's skill allowlist keeps research, GitHub, UI/Gateway/node diagnostics, Railway, and migration reconciliation. Other installed skills remain on disk. The bundled coding-agent skill is excluded because its required external-channel notification workflow conflicts with our dashboard/background-exec workflow; the local wrapper is the delegation procedure. Codex has its own skill context.
 
 The standing queue starts with `paulshorey/livx`, `paulshorey/map`, and `paulshorey/notes`. To add another repository, verify its GitHub remote and local `AGENTS.md`, then add a GitHub slug and absolute checkout path to `config/managed-repositories.tsv`. Other repositories remain available for explicit one-off requests. The coordinator checks all open PRs and issues in each managed repository, regardless of author; the status script uses paginated GitHub API queries for its snapshot. Open PRs, checks, reviews, and in-flight work take priority over new issue work.
 
@@ -101,11 +113,11 @@ Open the [private dashboard](https://pauls-macbook-pro.taila9173b.ts.net/chat) o
 
 - Each hourly heartbeat starts a **new dated conversation**, even when it revisits an existing workload. Find it in the **Heartbeats** sidebar group and reply there to follow up. Earlier conversations remain replyable.
 - Use **New conversation** (or **New** in the Android sidebar) for an unrelated request. The web shortcut is [New conversation](https://pauls-macbook-pro.taila9173b.ts.net/new?agent=main).
-- Human replies and background completions stay in the conversation that owns their run. The shared `state/` ledger links stable task IDs, originating/latest session keys, run IDs, and next actions across heartbeat conversations so a fresh chat does not duplicate ongoing work.
+- Human replies and background completions stay in the conversation that owns their run. `state/ACTIVE.md` indexes stable task IDs, owning/latest sessions, active runs, pending decisions and evidence notes so a fresh chat does not duplicate ongoing work.
 - Messages have **Copy as markdown** in the web UI.
 - For browser/PWA alerts, open **Settings → Notifications**, enable notifications, opt into **Agent finished**, **Agent questions**, and desired failure categories, and use **Send test** on each device. Native mobile notifications are configured separately. Verify an actual completion while the phone UI is closed; Gateway delivery acceptance alone does not prove a phone displayed it.
 
-Telegram's channel and plugin are disabled. Its destination/allowlist configuration and owner-command entry are removed, and its token is removed from active `~/.openclaw/.env` (a mode-0600 rollback copy remains under `~/.openclaw/backups/ui-workflow/`). The old provisioning scripts are retired. Historical topic sessions are archived and their transcripts/private notes retained as history; they must never be used as delivery destinations. `state/ui-migration.md` records the cutover and unfinished legacy work.
+Telegram's channel and plugin are disabled. Its destination/allowlist configuration and owner-command entry are removed, and its token is removed from active `~/.openclaw/.env` (a mode-0600 rollback copy remains under `~/.openclaw/backups/ui-workflow/`). The old provisioning scripts are retired. Historical topic sessions are archived and their transcripts/private notes retained as history; they must never be used as delivery destinations. `state/ui-migration.md` records the historical cutover; `state/ACTIVE.md` owns current work.
 
 To reapply the workflow after changing its prompt or templates:
 
@@ -113,12 +125,11 @@ To reapply the workflow after changing its prompt or templates:
 ./scripts/deploy-workspace.py
 python3 scripts/configure-ui-workflow.py --dry-run
 python3 scripts/configure-ui-workflow.py
-openclaw gateway restart
 openclaw config validate
 openclaw channels status --probe
 ```
 
-The configure helper preserves the Fireworks key, Gateway binding, Tailscale Serve, and device pairing. To verify the scheduler path, find **Heartbeat (main)** with `openclaw cron list --all`, run its ID with `openclaw cron run <id>`, and confirm a new visible conversation and a dated `state/heartbeat-launch-*.json` receipt. Check the conversation's summary and send a follow-up in that same session. Do not interpret the launcher's `NO_REPLY` as a missing report; the persistent child owns it. Do not edit the system-owned heartbeat automation directly; its desired state comes from `agents.defaults.heartbeat`.
+The Gateway reloads prompt/skill configuration; runtime templates are used on subsequent turns. Restart only when needed for environment/service changes. The configure helper preserves the Fireworks key, Gateway binding, Tailscale Serve, and device pairing. To verify the scheduler path, find **Heartbeat (main)** with `openclaw cron list --all`, run its ID with `openclaw cron run <id>`, and confirm a new visible conversation and a dated `state/heartbeat-launch-*.json` receipt. Check the summary, ACTIVE.md update and successful task termination. A follow-up should use the same session after the original run has ended. The launcher uses `expectsCompletionMessage=false` to skip the child report handoff. OpenClaw can still wake the launcher for session-state changes (including human replies in children); the prompt routes these to event handling with `NO_REPLY`, never another launch. The visible child's report remains in its own conversation. Do not edit the system-owned heartbeat automation directly; its desired state comes from `agents.defaults.heartbeat`.
 
 ## Delegate
 
