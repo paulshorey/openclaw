@@ -29,10 +29,7 @@ fi
 "$openclaw_bin" config set agents.defaults.workspace "$workspace"
 "$openclaw_bin" config set agents.entries.main.workspace "$workspace"
 "$openclaw_bin" config set agents.defaults.model.primary fireworks/accounts/fireworks/models/deepseek-v4p1-flash
-"$openclaw_bin" config set agents.defaults.heartbeat.every 1h
-"$openclaw_bin" config set agents.defaults.heartbeat.target none
-"$openclaw_bin" config set agents.defaults.heartbeat.isolatedSession true
-"$openclaw_bin" config set agents.defaults.heartbeat.prompt "$(< "$root/config/heartbeat-prompt.txt")"
+python3 "$root/scripts/configure-ui-workflow.py"
 "$openclaw_bin" config set memory.search.provider none
 "$openclaw_bin" config set env.shellEnv.enabled true
 "$openclaw_bin" config set gateway.bind loopback

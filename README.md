@@ -16,7 +16,7 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 
 ## Secrets
 
-- `~/.openclaw/.env` (mode `0600`): `FIREWORKS_API_KEY`, `TELEGRAM_BOT_TOKEN` (after Telegram setup)
+- `~/.openclaw/.env` (mode `0600`): `FIREWORKS_API_KEY`. Telegram is retired; its token is removed from the active environment.
 - Never in Git, config, or prompts. Rotate at Fireworks if exposed.
 - `env.shellEnv.enabled: true` → imports missing expected keys from login shell (`~/.zprofile` → `~/.shortcuts.sh` → `~/.secrets.sh`). See [environment precedence](https://docs.openclaw.ai/help/environment).
 
@@ -31,7 +31,7 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 | `scripts/delegate-codex.sh`                                          | Runs Codex Sol in a repo with project env; logs to `logs/`                                   |
 | `scripts/project-env.py`, `requirements.txt`                         | Project-scoped env runner + its dependency                                                   |
 | `scripts/status.sh`                                                  | Read-only Gateway/auth/PR/ingestion snapshot                                                 |
-| `scripts/start-telegram-pairing.sh`, `scripts/configure-telegram.sh`, `scripts/check-telegram-bot.py` | Telegram owner pairing, topic-mode check, and allowlist |
+| `scripts/configure-ui-workflow.py`                                    | Applies dashboard heartbeat routing, disables Telegram, removes its active bot token |
 
 ## OpenClaw Coordinator Files
 
@@ -92,21 +92,33 @@ openclaw dashboard            # http://127.0.0.1:18789/
 
 - Gateway currently **running** as a LaunchAgent. Loopback only.
 - LaunchAgent runs only while logged in and awake.
-- Heartbeat: every `1h` (`agents.defaults.heartbeat.every`); lives in the scheduler, no `HEARTBEAT.md`. The isolated heartbeat pass sends workload updates to Telegram topics through message actions and returns `NO_REPLY` when quiet.
+- Heartbeat: every `1h` (`agents.defaults.heartbeat.every`); lives in the scheduler, no `HEARTBEAT.md`. Each isolated launcher creates one persistent dashboard conversation with `sessions_spawn visible=true`, in the `Heartbeats` group. The new conversation runs the bounded coordination pass and always leaves a readable summary, including when nothing changed. The launcher records a receipt and returns `NO_REPLY` after dispatch.
 - Dashboard auth is tied to the browser profile that ran `openclaw dashboard`.
 
-## Telegram workload conversations
+## Dashboard and mobile conversations
 
-Current bot: [@PaulShoreyOpenClawBot](https://t.me/PaulShoreyOpenClawBot). Its token is in the ignored `~/.openclaw/.env`, the owner's numeric ID is configured in OpenClaw's local allowlist, BotFather private-chat topics and user-created topics are enabled, and group adds are disabled. The live Gateway probe reports Telegram connected.
+Open the [private dashboard](https://pauls-macbook-pro.taila9173b.ts.net/chat) on a paired desktop or phone connected to the tailnet. The Gateway remains bound to loopback, with Tailscale Serve providing private HTTPS. The Android app also connects to this Gateway.
 
-For a new Mac or replacement bot:
+- Each hourly heartbeat starts a **new dated conversation**, even when it revisits an existing workload. Find it in the **Heartbeats** sidebar group and reply there to follow up. Earlier conversations remain replyable.
+- Use **New conversation** (or **New** in the Android sidebar) for an unrelated request. The web shortcut is [New conversation](https://pauls-macbook-pro.taila9173b.ts.net/new?agent=main).
+- Human replies and background completions stay in the conversation that owns their run. The shared `state/` ledger links stable task IDs, originating/latest session keys, run IDs, and next actions across heartbeat conversations so a fresh chat does not duplicate ongoing work.
+- Messages have **Copy as markdown** in the web UI.
+- For browser/PWA alerts, open **Settings → Notifications**, enable notifications, opt into **Agent finished**, **Agent questions**, and desired failure categories, and use **Send test** on each device. Native mobile notifications are configured separately. Verify an actual completion while the phone UI is closed; Gateway delivery acceptance alone does not prove a phone displayed it.
 
-1. Create a bot via [@BotFather](https://t.me/BotFather). Enable **Topics/Threaded Mode** and **Allow users to create topics** for that bot. Add `TELEGRAM_BOT_TOKEN=...` to `~/.openclaw/.env` and keep the file at mode `0600`. Do not paste the token into a chat or tracked file.
-2. Run `./scripts/start-telegram-pairing.sh`, DM the bot, and note your numeric Telegram user ID from its pairing reply.
-3. Run `./scripts/configure-telegram.sh <user-id>`. This verifies BotFather's topic settings, allows only your DM, disables groups, sets your chat as the destination for explicit topic messages, and restarts the Gateway. Automatic flat-DM heartbeat delivery stays off.
-4. Verify `openclaw channels status --probe`, then send the bot a message in a newly created topic. Use `openclaw sessions --json` to confirm that the topic has a distinct session key. Send a new message from Telegram's **All Messages** view and verify that Telegram creates another topic with another session key.
+Telegram's channel and plugin are disabled. Its destination/allowlist configuration and owner-command entry are removed, and its token is removed from active `~/.openclaw/.env` (a mode-0600 rollback copy remains under `~/.openclaw/backups/ui-workflow/`). The old provisioning scripts are retired. Historical topic sessions are archived and their transcripts/private notes retained as history; they must never be used as delivery destinations. `state/ui-migration.md` records the cutover and unfinished legacy work.
 
-Each heartbeat workload uses one persistent private-chat topic. The coordinator creates it when the workload is selected, records its topic ID in `runtime/coordinator/state/`, and sends new progress and result messages to it. Reply inside that topic to continue the workload. Send from **All Messages** to start an unrelated topic and workflow. Hourly heartbeat runs are transient; topics and the task ledger preserve continuity. If Telegram topic creation or delivery fails, the coordinator records the failure and retries on the next pass.
+To reapply the workflow after changing its prompt or templates:
+
+```sh
+./scripts/deploy-workspace.py
+python3 scripts/configure-ui-workflow.py --dry-run
+python3 scripts/configure-ui-workflow.py
+openclaw gateway restart
+openclaw config validate
+openclaw channels status --probe
+```
+
+The configure helper preserves the Fireworks key, Gateway binding, Tailscale Serve, and device pairing. To verify the scheduler path, find **Heartbeat (main)** with `openclaw cron list --all`, run its ID with `openclaw cron run <id>`, and confirm a new visible conversation and a dated `state/heartbeat-launch-*.json` receipt. Check the conversation's summary and send a follow-up in that same session. Do not interpret the launcher's `NO_REPLY` as a missing report; the persistent child owns it. Do not edit the system-owned heartbeat automation directly; its desired state comes from `agents.defaults.heartbeat`.
 
 ## Delegate
 
@@ -135,4 +147,5 @@ Each heartbeat workload uses one persistent private-chat topic. The coordinator 
 ## References
 
 - OpenClaw: [install](https://docs.openclaw.ai/install), [macOS Gateway](https://docs.openclaw.ai/platforms/mac/bundled-gateway), [workspace](https://docs.openclaw.ai/agent-workspace), [heartbeat](https://docs.openclaw.ai/heartbeat), [Fireworks provider](https://docs.openclaw.ai/providers/fireworks)
+- Dashboard workflow: [session tools](https://docs.openclaw.ai/concepts/session-tool), [sessions and sidebar](https://docs.openclaw.ai/web/control-ui/sessions-and-sidebar), [notifications](https://docs.openclaw.ai/web/notifications)
 - [DeepSeek V4.1 Flash](https://fireworks.ai/models/deepseek-ai/deepseek-v4p1-flash), [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol)
