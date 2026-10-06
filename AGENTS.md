@@ -4,7 +4,7 @@ This repository develops and configures the local OpenClaw coordinator. This roo
 
 ## Layout and workflow
 
-- `config/coordinator/*.template`: source for OpenClaw's `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`.
+- `config/coordinator/*.template`: source for OpenClaw's injected `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, plus the on-demand `MAP-IMPORTS.md` procedure.
 - `config/heartbeat-prompt.txt`: scheduled coordinator prompt.
 - `config/managed-repositories.tsv`: reviewed GitHub/local checkout inventory; add future managed repositories here.
 - `runtime/coordinator/`: active OpenClaw workspace, with deployed instructions and private `state/`, `logs/`, and memory. Do not commit or wipe it.

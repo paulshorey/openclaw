@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -37,7 +38,7 @@ class RunnerTests(unittest.TestCase):
         self.receipt = {'schema_version': 1, 'owner_session': OWNER, 'gateway': GATEWAY,
                         'checked_at': '2026-10-05T09:01:00+00:00', 'completed_at': '2026-10-05T09:00:00+00:00',
                         'native_process_id': 'fixture-process', 'completion_event_id': 'fixture-event',
-                        'completion_status': 'succeeded', 'notification_kind': 'terminal_callback', 'evidence_path': str(self.evidence)}
+                        'completion_status': 'succeeded', 'notification_kind': 'internal_system_event', 'evidence_path': str(self.evidence)}
         self.receipt_path.write_text(json.dumps(self.receipt))
         self.workspace_patch = patch.object(runner, 'WORKSPACE', self.workspace)
         self.workspace_patch.start()
@@ -64,11 +65,11 @@ class RunnerTests(unittest.TestCase):
     def test_current_witnessed_receipt_is_accepted(self):
         self.assertEqual(self.validate_receipt(), self.receipt)
 
-    def test_legacy_native_exit_proof_does_not_authorize_terminal_callback(self):
-        for kind in (None, 'native_exec_completion'):
+    def test_legacy_native_structured_system_or_chat_proof_cannot_admit_generic_events(self):
+        for kind in (None, 'native_exec_completion', 'terminal_callback', 'chat_callback'):
             with self.subTest(kind=kind):
                 self.rewrite_receipt(notification_kind=kind)
-                with self.assertRaisesRegex(ValueError, 'targeted terminal_callback'):
+                with self.assertRaisesRegex(ValueError, 'generic internal_system_event'):
                     self.validate_receipt()
 
     def test_another_dashboard_cannot_borrow_receipt(self):
@@ -309,7 +310,8 @@ class RunnerTests(unittest.TestCase):
     def test_foreground_watch_forwards_and_privately_captures_without_detaching(self):
         child = Mock(stdout=io.StringIO('{"started":true}\n{"terminal":true}\n'))
         child.wait.return_value = 0
-        with patch.object(runner.subprocess, 'Popen', return_value=child) as start, \
+        with patch.dict(os.environ, {'OPENCLAW_SUBAGENT_EXEC': '1'}), \
+             patch.object(runner.subprocess, 'Popen', return_value=child) as start, \
              patch.object(runner.signal, 'signal'), redirect_stdout(io.StringIO()) as output:
             code, captured = runner.foreground_watch(['fixture-command'], self.workspace)
         self.assertEqual(code, 0)
@@ -318,20 +320,87 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual((self.workspace / 'watch.stdout').stat().st_mode & 0o777, 0o600)
         self.assertNotIn('start_new_session', start.call_args.kwargs)
         self.assertNotIn('shell', start.call_args.kwargs)
+        self.assertEqual(start.call_args.kwargs['env']['OPENCLAW_SUBAGENT_EXEC'], '1')
         child.wait.assert_called_once_with()
 
-    def test_targeted_callback_requires_actual_json_acceptance_and_never_waits_for_model(self):
-        response = subprocess.CompletedProcess([], 0, '{"ok":true}', '')
-        with patch.object(runner.subprocess, 'run', return_value=response) as send:
-            receipt = runner.terminal_callback(OWNER, 'fixture-event', 'Exec completed (fixture, code 0)', self.workspace)
+    def test_targeted_generic_system_event_preserves_subagent_flag_and_never_waits_for_model(self):
+        acknowledgement = {'ok': True}
+        response = subprocess.CompletedProcess([], 0, json.dumps(acknowledgement), '')
+        with patch.dict(os.environ, {'OPENCLAW_SUBAGENT_EXEC': '1'}), \
+             patch.object(runner.subprocess, 'run', return_value=response) as send:
+            receipt = runner.terminal_callback(OWNER, 'fixture-event', 'outcome=succeeded exit_code=0', self.workspace)
         self.assertEqual(receipt['status'], 'accepted')
-        self.assertEqual(receipt['acknowledgement'], {'ok': True})
+        self.assertEqual(receipt['acknowledgement'], acknowledgement)
+        self.assertEqual(receipt['notification_kind'], 'internal_system_event')
+        self.assertNotIn('dispatch_id', receipt)
         args = send.call_args.args[0]
         self.assertEqual(args[:3], [runner.OPENCLAW, 'system', 'event'])
         self.assertEqual(args[args.index('--session-key') + 1], OWNER)
         self.assertEqual(args[args.index('--mode') + 1], 'now')
+        self.assertEqual(send.call_args.kwargs['env']['OPENCLAW_SUBAGENT_EXEC'], '1')
+        message = args[args.index('--text') + 1]
+        self.assertTrue(message.startswith('INTERNAL_MAP_TERMINAL_EVENT\n'))
+        self.assertIn('Sender: local run-map-import wrapper', message)
+        self.assertIn('event_id=fixture-event', message)
+        self.assertIn('outcome=succeeded exit_code=0', message)
+        self.assertIn('Read AGENTS.md and MAP-IMPORTS.md', message)
         self.assertNotIn('--expect-final', args)
-        self.assertEqual(json.loads((self.workspace / 'callback.json').read_text())['acknowledgement'], {'ok': True})
+        self.assertNotIn('--params', args)
+        self.assertEqual(json.loads((self.workspace / 'callback.json').read_text())['acknowledgement'], acknowledgement)
+
+    def test_generic_payload_cannot_match_installed_structured_exec_event_classifier(self):
+        # These patterns match the installed heartbeat-events-filter implementation.
+        structured = re.compile(r'^exec (completed|failed) \(([a-z0-9_-]{1,64}), (code -?\d+|signal [^)]+)\)(?: :: ([\s\S]*))?$', re.IGNORECASE)
+        finished = re.compile(r'^exec finished(?::|\s*\()', re.IGNORECASE)
+        with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '{"ok":true}', '')) as send:
+            runner.terminal_callback(OWNER, 'fixture-event', 'event=fixture-event evidence=/private/terminal.json outcome=blocked exit_code=78', self.workspace)
+        args = send.call_args.args[0]
+        text = args[args.index('--text') + 1]
+        self.assertFalse(structured.search(text.strip()))
+        self.assertFalse(finished.search(text.lstrip()))
+        self.assertNotIn('Exec completed', text)
+        self.assertNotIn('Exec failed', text)
+        self.assertTrue(structured.search('Exec completed (fixture, code 0) :: old structured payload'))
+
+    def test_chained_generic_events_target_same_owner_and_preserve_distinct_event_ids(self):
+        captured = []
+        def acknowledge(command, **_kwargs):
+            captured.append(command)
+            return subprocess.CompletedProcess(command, 0, '{"ok":true}', '')
+        events = ['map-terminal-preflight:11111111-2222-4333-8444-555555555555',
+                  'ingestion:22222222-3333-4444-8555-666666666666:terminal']
+        with patch.object(runner.subprocess, 'run', side_effect=acknowledge) as send:
+            for index, event in enumerate(events):
+                directory = self.workspace / f'chained-{index}'
+                directory.mkdir()
+                receipt = runner.terminal_callback(OWNER, event, f'event={event} evidence=/private/fixture-{index}.json', directory)
+                self.assertEqual(receipt['status'], 'accepted')
+                self.assertEqual(receipt['event_id'], event)
+        self.assertEqual(send.call_count, 2)
+        for command, event in zip(captured, events):
+            self.assertEqual(command[command.index('--session-key') + 1], OWNER)
+            message = command[command.index('--text') + 1]
+            self.assertIn(f'event_id={event}', message)
+            self.assertIn('INTERNAL_MAP_TERMINAL_EVENT', message)
+
+    def test_zero_exit_without_positive_system_ack_remains_uncertain(self):
+        acknowledgements = [{}, {'runId': 'old-chat-run', 'status': 'started'},
+                            {'ok': 1}, {'ok': 'true'}, {'status': 'ok'}]
+        for index, acknowledgement in enumerate(acknowledgements):
+            directory = self.workspace / f'callback-{index}'
+            directory.mkdir()
+            with self.subTest(acknowledgement=acknowledgement), \
+                 patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, json.dumps(acknowledgement), '')) as send:
+                receipt = runner.terminal_callback(OWNER, 'fixture-event', 'fixture-text', directory)
+            self.assertEqual(receipt['status'], 'uncertain')
+            self.assertEqual(receipt['acknowledgement'], acknowledgement)
+            send.assert_called_once()
+
+    def test_false_ack_is_explicit_failure_even_with_zero_exit(self):
+        with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '{"ok":false}', '')):
+            receipt = runner.terminal_callback(OWNER, 'fixture-event', 'fixture-text', self.workspace)
+        self.assertEqual(receipt['status'], 'failed')
+        self.assertIn('explicitly rejected', receipt['reason'])
 
     def test_zero_exit_without_ack_is_uncertain_and_second_attempt_is_blocked(self):
         with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, 'not-json', '')) as send:
@@ -368,7 +437,7 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(callback.call_args.args[1], result['event_id'])
         self.assertIn(f'result={result_path}', callback.call_args.args[2])
-        self.assertIn('code 2', callback.call_args.args[2])
+        self.assertIn('exit_code=2', callback.call_args.args[2])
         watch.assert_called_once()
         callback.assert_called_once()
 
@@ -383,7 +452,7 @@ class RunnerTests(unittest.TestCase):
         self.assertNotIn('job_id', evidence)
         self.assertNotIn('run_id', evidence)
         self.assertTrue(callback.call_args.args[1].startswith('map-import-wrapper:'))
-        self.assertIn('code 78', callback.call_args.args[2])
+        self.assertIn('exit_code=78', callback.call_args.args[2])
         watch.assert_called_once()
         callback.assert_called_once()
 
@@ -423,7 +492,7 @@ class RunnerTests(unittest.TestCase):
         evidence = json.loads((self.workspace / 'preflight.json').read_text())
         self.assertEqual(evidence['owner_session'], OWNER)
         self.assertEqual(evidence['gateway'], GATEWAY)
-        self.assertEqual(evidence['notification_kind'], 'terminal_callback')
+        self.assertEqual(evidence['notification_kind'], 'internal_system_event')
         self.assertTrue(evidence['event_id'].startswith('map-terminal-preflight:'))
         self.assertIn(evidence['marker'], callback.call_args.args[2])
         self.assertIn('Acceptance is not automatic-continuation proof', output.getvalue())

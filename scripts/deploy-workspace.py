@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "config" / "coordinator"
 DEST = ROOT / "runtime" / "coordinator"
 MANIFEST = DEST / ".deployed-files.json"
-NAMES = ("AGENTS.md", "SOUL.md", "IDENTITY.md", "USER.md")
+NAMES = ("MAP-IMPORTS.md", "AGENTS.md", "SOUL.md", "IDENTITY.md", "USER.md")
 
 
 def digest(data: bytes) -> str:

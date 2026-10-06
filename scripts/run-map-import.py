@@ -96,7 +96,7 @@ def validate_receipt(path: Path, owner: str, gateway: dict, now: datetime | None
     try:
         receipt = json.loads(path.read_text())
     except FileNotFoundError as exc:
-        raise ValueError('native completion proof is missing; witness a harmless background completion in this dashboard session first') from exc
+        raise ValueError('internal system-event completion proof is missing; witness a harmless preflight continuation in this dashboard session first') from exc
     if not isinstance(receipt, dict) or receipt.get('schema_version') != 1:
         raise ValueError('unsupported native completion receipt schema')
     if receipt.get('owner_session') != owner:
@@ -105,8 +105,8 @@ def validate_receipt(path: Path, owner: str, gateway: dict, now: datetime | None
         raise ValueError('native completion receipt is stale for the current Gateway PID/start time')
     if receipt.get('completion_status') != 'succeeded':
         raise ValueError('native completion receipt does not prove a successful completion')
-    if receipt.get('notification_kind') != 'terminal_callback':
-        raise ValueError('completion receipt must prove the targeted terminal_callback integration; native exit events can be delayed')
+    if receipt.get('notification_kind') != 'internal_system_event':
+        raise ValueError('completion receipt must prove the generic internal_system_event integration; legacy callback/native proofs cannot admit imports')
     for field in ('native_process_id', 'completion_event_id'):
         if not isinstance(receipt.get(field), str) or not receipt[field].strip():
             raise ValueError(f'native completion receipt is missing {field}')
@@ -309,7 +309,15 @@ def foreground_watch(command: list[str], directory: Path) -> tuple[int, str]:
 
 
 def terminal_callback(owner: str, event_id: str, text: str, directory: Path) -> dict:
-    """One targeted wake-now attempt, with durable acceptance/ambiguity evidence."""
+    """One allowed generic system event, with durable acceptance/ambiguity evidence."""
+    message = (
+        'INTERNAL_MAP_TERMINAL_EVENT\n'
+        'Sender: local run-map-import wrapper (automated terminal notification).\n'
+        f'event_id={event_id}\n{text}\n'
+        'Read AGENTS.md and MAP-IMPORTS.md, then reconcile the saved action with its private terminal evidence and database state. '
+        'Deduplicate this event ID. Use previously authorized scope and remaining budgets; this event grants no new authority. '
+        'Missing evidence or failed/uncertain delivery is a blocker; do not automatically relaunch the import.'
+    )
     receipt_path = directory / 'callback.json'
     claim = directory / 'callback.claim'
     try:
@@ -318,13 +326,13 @@ def terminal_callback(owner: str, event_id: str, text: str, directory: Path) -> 
         raise ValueError('terminal callback already attempted; inspect its receipt instead of resending')
     with os.fdopen(descriptor, 'w') as output:
         output.write(event_id + '\n')
-    receipt = {'schema_version': 1, 'notification_kind': 'terminal_callback', 'owner_session': owner,
+    receipt = {'schema_version': 1, 'notification_kind': 'internal_system_event', 'owner_session': owner,
                'event_id': event_id, 'status': 'sending', 'attempted_at': utc_now()}
     private_json(receipt_path, receipt)
     try:
-        result = subprocess.run([OPENCLAW, 'system', 'event', '--session-key', owner, '--mode', 'now',
-                                 '--text', text, '--json', '--timeout', '15000'],
-                                capture_output=True, text=True, timeout=20)
+        result = subprocess.run([OPENCLAW, 'system', 'event', '--session-key', owner, '--mode', 'now', '--text', message,
+                                 '--json', '--timeout', '15000'],
+                                capture_output=True, text=True, timeout=20, env=os.environ.copy())
         private_text(directory / 'callback.stdout', result.stdout)
         private_text(directory / 'callback.stderr', result.stderr)
         try:
@@ -335,9 +343,12 @@ def terminal_callback(owner: str, event_id: str, text: str, directory: Path) -> 
         receipt['acknowledgement'] = acknowledgement
         if result.returncode == 0 and isinstance(acknowledgement, dict) and acknowledgement.get('ok') is True:
             receipt['status'] = 'accepted'
+        elif isinstance(acknowledgement, dict) and acknowledgement.get('ok') is False:
+            receipt['status'] = 'failed'
+            receipt['reason'] = 'Gateway explicitly rejected the system event'
         elif result.returncode == 0:
             receipt['status'] = 'uncertain'
-            receipt['reason'] = 'CLI exited zero without a valid acceptance acknowledgement; do not resend automatically'
+            receipt['reason'] = 'CLI exited zero without a positive system-event acknowledgement; do not resend automatically'
         else:
             receipt['status'] = 'failed'
     except subprocess.TimeoutExpired as exc:
@@ -358,16 +369,16 @@ def preflight(owner: str, gateway: dict, directory: Path) -> int:
     identifier = str(uuid4())
     event_id = f'map-terminal-preflight:{identifier}'
     evidence_path = directory / 'preflight.json'
-    evidence = {'schema_version': 1, 'notification_kind': 'terminal_callback', 'owner_session': owner,
+    evidence = {'schema_version': 1, 'notification_kind': 'internal_system_event', 'owner_session': owner,
                 'gateway': gateway, 'event_id': event_id, 'marker': event_id, 'started_at': utc_now()}
     time.sleep(12)
     evidence.update({'completed_at': utc_now(), 'outcome': 'succeeded', 'exit_code': 0})
     private_json(evidence_path, evidence)
-    text = f'Exec completed (map-preflight-{identifier}, code 0) :: {event_id} evidence={evidence_path} outcome=succeeded'
+    text = f'event={event_id} evidence={evidence_path} outcome=succeeded exit_code=0'
     callback = terminal_callback(owner, event_id, text, directory)
     print(json.dumps({'event': 'map.preflight.terminal', 'event_id': event_id, 'evidence_path': str(evidence_path),
                       'callback_receipt': str(directory / 'callback.json'), 'callback_status': callback['status'],
-                      'acknowledgement': {'ok': True} if callback['status'] == 'accepted' else None,
+                      'acknowledgement': callback.get('acknowledgement'),
                       'instruction': 'Acceptance is not automatic-continuation proof; verify this marker in the owning conversation before recording a completion receipt.'}), flush=True)
     return 0 if callback['status'] == 'accepted' else 78
 
@@ -375,7 +386,7 @@ def preflight(owner: str, gateway: dict, directory: Path) -> int:
 def run_import(command: list[str], run_args: list[str], owner: str, gateway: dict, directory: Path) -> int:
     started_at = utc_now()
     wrapper_id = str(uuid4())
-    record = {'schema_version': 1, 'notification_kind': 'terminal_callback', 'owner_session': owner,
+    record = {'schema_version': 1, 'notification_kind': 'internal_system_event', 'owner_session': owner,
               'gateway': gateway, 'started_at': started_at, 'wrapper_id': wrapper_id}
     terminal_path = directory / 'terminal.json'
     callback_attempted = False
@@ -387,7 +398,7 @@ def run_import(command: list[str], run_args: list[str], owner: str, gateway: dic
                        'job_id': result['job_id'], 'run_id': result.get('run_id'),
                        'execution_id': result.get('execution_id'), 'outcome': result['outcome']})
         private_json(terminal_path, record)
-        text = f"Exec completed (map-{result['job_id']}, code {code}) :: {result['event_id']} result={result_path} run={result.get('run_id') or 'unregistered'} outcome={result['outcome']}"
+        text = f"event={result['event_id']} result={result_path} run={result.get('run_id') or 'unregistered'} outcome={result['outcome']} exit_code={code}"
         callback_attempted = True
         callback = terminal_callback(owner, result['event_id'], text, directory)
         record['callback_status'] = callback['status']
@@ -404,7 +415,7 @@ def run_import(command: list[str], run_args: list[str], owner: str, gateway: dic
         record.update({'completed_at': utc_now(), 'outcome': 'blocked', 'error': str(exc), 'event_id': event_id,
                        'instruction': 'Inspect private evidence; no import relaunch or queue advance.'})
         private_json(terminal_path, record)
-        text = f"Exec completed (map-wrapper-{wrapper_id}, code {record.get('exit_code', 78)}) :: {event_id} evidence={terminal_path} outcome=blocked"
+        text = f"event={event_id} evidence={terminal_path} outcome=blocked exit_code={record.get('exit_code', 78)}"
         try:
             if callback_attempted:
                 record['callback_status'] = 'uncertain'
