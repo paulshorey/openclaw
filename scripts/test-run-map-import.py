@@ -125,16 +125,25 @@ class RunnerTests(unittest.TestCase):
     def test_all_zero_budgets_are_valid(self):
         self.assertTrue(all(value == 0 for value in runner.validate_budgets(ZERO_BUDGETS).values()))
 
-    def test_budgets_are_explicit_unique_and_finite(self):
-        cases = [ZERO_BUDGETS[:-2], [*ZERO_BUDGETS, '--max-cost-usd', '1'],
+    def test_optional_budgets_when_present_are_unique_and_finite(self):
+        cases = [[*ZERO_BUDGETS, '--max-cost-usd', '1'],
                  ['--max-llm-requests', '1.5', *ZERO_BUDGETS[2:]],
                  ['--max-llm-requests', str(2**53), *ZERO_BUDGETS[2:]],
-                 [*ZERO_BUDGETS, '--max-cost-usd=1'], [*ZERO_BUDGETS, '--consolidate']]
+                 [*ZERO_BUDGETS, '--max-cost-usd=1'], [*ZERO_BUDGETS, '--consolidate'],
+                 ['--max-cost-usd'], ['--unlimited', '--unlimited'], ['--unlimited=true']]
         for cost in ('NaN', 'Infinity', '-1', '1_0', '1e999', '1e-999'):
             cases.append([*ZERO_BUDGETS[:3], cost, *ZERO_BUDGETS[4:]])
         for args in cases:
             with self.subTest(args=args), self.assertRaises(ValueError):
                 runner.validate_budgets(args)
+
+    def test_manual_caps_are_independently_optional_and_conflict_with_unlimited(self):
+        self.assertEqual(runner.validate_budgets([]), {})
+        for arguments in (['--max-cost-usd', '0.10'], ['--max-llm-requests', '4'], ['--geocode-limit', '0']):
+            with self.subTest(arguments=arguments):
+                self.assertEqual(len(runner.validate_budgets(arguments)), 1)
+                with self.assertRaisesRegex(ValueError, 'cannot be combined'):
+                    runner.validate_budgets([*arguments, '--unlimited'])
 
     def test_gateway_identity_captures_only_pid_and_start_time(self):
         calls = [subprocess.CompletedProcess([], 0, 'state = running\n pid = 1234\n environment = {SECRET=fixture-secret}\n', ''),
@@ -170,6 +179,70 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(command[command.index('watch') + 1:], ['--max-hours', '7', '--', *scope])
         self.assertIn('DB_MAP_URL', command)
         self.assertNotIn('FIREWORKS_API_KEY', command)
+
+    def test_default_new_file_launch_is_unlimited_without_full_run_deadline(self):
+        scope = ['data/poi/source.json', '--category', 'campground']
+        result, _, receipt, execute = self.main_fixture(['--owner-session', OWNER, '--', *scope])
+        self.assertEqual(result, 0)
+        receipt.assert_called_once()
+        command = execute.call_args.args[0]
+        forwarded = [*scope, '--unlimited']
+        self.assertEqual(command[command.index('watch') + 1:], ['--', *forwarded])
+        self.assertEqual(execute.call_args.args[1], forwarded)
+        self.assertNotIn('--max-hours', command)
+        self.assertIn('FIREWORKS_API_KEY', command)
+
+    def test_default_resume_clears_inherited_caps_and_has_no_deadline(self):
+        scope = ['--resume', '11111111-2222-4333-8444-555555555555']
+        result, _, _, execute = self.main_fixture(['--owner-session', OWNER, '--', *scope])
+        self.assertEqual(result, 0)
+        command = execute.call_args.args[0]
+        self.assertEqual(command[command.index('watch') + 1:], ['--', *scope, '--unlimited'])
+        self.assertEqual(execute.call_args.args[1], [*scope, '--unlimited'])
+        self.assertNotIn('--max-hours', command)
+
+    def test_explicit_unlimited_passes_once_and_optional_deadline_is_preserved(self):
+        scope = ['--resume', '11111111-2222-4333-8444-555555555555', '--unlimited']
+        result, _, _, execute = self.main_fixture(['--owner-session', OWNER, '--max-hours', '12', '--', *scope])
+        self.assertEqual(result, 0)
+        command = execute.call_args.args[0]
+        self.assertEqual(command[command.index('watch') + 1:], ['--max-hours', '12', '--', *scope])
+        self.assertEqual(command.count('--unlimited'), 1)
+
+    def test_optional_single_manual_cap_neither_requires_other_caps_nor_sets_deadline(self):
+        scope = ['--resume', '11111111-2222-4333-8444-555555555555', '--max-cost-usd', '1.25']
+        result, _, _, execute = self.main_fixture(['--owner-session', OWNER, '--', *scope])
+        self.assertEqual(result, 0)
+        command = execute.call_args.args[0]
+        self.assertEqual(command[command.index('watch') + 1:], ['--', *scope])
+        self.assertNotIn('--unlimited', command)
+        self.assertNotIn('--max-hours', command)
+        self.assertIn('FIREWORKS_API_KEY', command)
+
+    def test_explicit_zero_budget_suffix_still_exempts_key_without_deadline(self):
+        scope = ['data/poi/source.json', '--category', 'campground', '--from', 'verify', *ZERO_BUDGETS]
+        result, _, _, execute = self.main_fixture(['--owner-session', OWNER, '--', *scope])
+        self.assertEqual(result, 0)
+        command = execute.call_args.args[0]
+        self.assertEqual(command[command.index('watch') + 1:], ['--', *scope])
+        self.assertNotIn('FIREWORKS_API_KEY', command)
+        self.assertNotIn('--max-hours', command)
+
+    def test_suffix_without_all_explicit_zero_caps_still_requires_fireworks(self):
+        scope = ['data/poi/source.json', '--category', 'campground', '--from', 'report', '--max-cost-usd', '0']
+        self.assertFalse(runner.explicit_provider_free_scope(scope, runner.validate_budgets(scope)))
+
+    def test_unlimited_with_manual_caps_blocks_before_foreground_launch(self):
+        scope = ['data/poi/source.json', '--category', 'campground', '--unlimited', '--max-cost-usd', '0']
+        result, output, _, execute = self.main_fixture(['--owner-session', OWNER, '--', *scope])
+        self.assertEqual(result, 78)
+        self.assertIn('cannot be combined', output)
+        execute.assert_not_called()
+
+    def test_optional_manual_deadline_rejects_invalid_values(self):
+        for hours in ('0', '169', '-1', '1.5'):
+            with self.subTest(hours=hours), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                runner.parse_arguments(['--owner-session', OWNER, '--max-hours', hours, '--', 'source.json', '--category', 'campground'])
 
     def test_new_verify_scope_without_conflicts_is_provider_free(self):
         scope = ['data/poi/source.json', '--category', 'campground', '--from', 'verify', *ZERO_BUDGETS]
@@ -480,6 +553,24 @@ class RunnerTests(unittest.TestCase):
         evidence = json.loads((self.workspace / 'terminal.json').read_text())
         self.assertTrue(evidence['notification_blocked'])
         self.assertEqual(evidence['event_id'], result['event_id'])
+        callback.assert_called_once()
+
+    def test_unlimited_terminal_with_unknown_cost_evidence_is_not_a_wrapper_blocker(self):
+        scope = ['source.json', '--category', 'campground', '--unlimited']
+        result_path, result, job, launch, _ = self.terminal_fixture(scope)
+        result['evidence'] = {'normalization_usage': {'requests': 1, 'estimated_cost_usd': 0, 'unknown_cost_requests': 1}}
+        result_path.write_text(json.dumps(result))
+        result_path.with_name('job.json').write_text(json.dumps(job))
+        output = json.dumps(launch) + '\n' + json.dumps(result)
+        with patch.object(runner, 'utc_now', return_value='2026-10-05T09:00:00+00:00'), \
+             patch.object(runner, 'foreground_watch', return_value=(0, output)), \
+             patch.object(runner, 'terminal_callback', return_value={'status': 'accepted'}) as callback, \
+             redirect_stdout(io.StringIO()):
+            code = runner.run_import(['fixture-command'], scope, OWNER, GATEWAY, self.workspace)
+        self.assertEqual(code, 0)
+        evidence = json.loads((self.workspace / 'terminal.json').read_text())
+        self.assertEqual(evidence['outcome'], 'succeeded')
+        self.assertFalse(evidence['notification_blocked'])
         callback.assert_called_once()
 
     def test_preflight_waits_fixed_time_writes_evidence_and_cannot_create_proof(self):

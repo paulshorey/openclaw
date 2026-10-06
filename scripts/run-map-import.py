@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate native ownership, witnessed completion and budgets before map watch."""
+"""Validate native ownership and completion proof before continuous map watch."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ MAX_SAFE_INTEGER = 2**53 - 1
 OPENCLAW = '/opt/homebrew/bin/openclaw'
 UUID = re.compile(r'^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$', re.IGNORECASE)
 MAX_OUTPUT_BYTES = 512 * 1024
+BUDGET_FLAGS = ('--max-llm-requests', '--max-cost-usd', '--geocode-limit')
 
 
 def validate_owner(owner: str | None) -> str:
@@ -126,8 +127,13 @@ def validate_receipt(path: Path, owner: str, gateway: dict, now: datetime | None
 
 
 def validate_budgets(run_args: list[str]) -> dict[str, Decimal]:
+    """Validate optional manual caps, never require a provider allowance."""
+    if run_args.count('--unlimited') > 1 or any(value.startswith('--unlimited=') for value in run_args):
+        raise ValueError('provide --unlimited at most once without a value')
     budgets = {}
-    for flag in ('--max-llm-requests', '--max-cost-usd', '--geocode-limit'):
+    for flag in BUDGET_FLAGS:
+        if flag not in run_args and not any(value.startswith(flag + '=') for value in run_args):
+            continue
         if run_args.count(flag) != 1 or any(value.startswith(flag + '=') for value in run_args):
             raise ValueError(f'provide exactly one explicit {flag} followed by its nonnegative budget')
         index = run_args.index(flag)
@@ -150,9 +156,18 @@ def validate_budgets(run_args: list[str]) -> dict[str, Decimal]:
         if flag == '--max-cost-usd' and numeric > 0 and float(numeric) == 0:
             raise ValueError('--max-cost-usd is too small to represent')
         budgets[flag] = numeric
+    if '--unlimited' in run_args and budgets:
+        raise ValueError('--unlimited cannot be combined with explicit provider caps')
     if '--consolidate' in run_args:
         raise ValueError('global consolidation is outside the native file queue')
     return budgets
+
+
+def default_unlimited(run_args: list[str], budgets: dict[str, Decimal]) -> list[str]:
+    # Explicit unlimited clears inherited caps on managed resume as well as new runs.
+    if not budgets and '--unlimited' not in run_args:
+        return [*run_args, '--unlimited']
+    return list(run_args)
 
 
 def explicit_provider_free_scope(run_args: list[str], budgets: dict[str, Decimal]) -> bool:
@@ -162,7 +177,7 @@ def explicit_provider_free_scope(run_args: list[str], budgets: dict[str, Decimal
     Resume retains the original stage scope, regardless of its replacement budgets.
     Be conservative about malformed, duplicate or unrecognized stage options.
     """
-    if not run_args or run_args[0].startswith('--') or any(value != 0 for value in budgets.values()):
+    if not run_args or run_args[0].startswith('--') or set(budgets) != set(BUDGET_FLAGS) or any(value != 0 for value in budgets.values()):
         return False
     valued_flags = {'--category', '--record', '--limit', '--from', '--stop-after',
                     '--max-llm-requests', '--max-cost-usd', '--geocode-limit'}
@@ -315,7 +330,7 @@ def terminal_callback(owner: str, event_id: str, text: str, directory: Path) -> 
         'Sender: local run-map-import wrapper (automated terminal notification).\n'
         f'event_id={event_id}\n{text}\n'
         'Read AGENTS.md and MAP-IMPORTS.md, then reconcile the saved action with its private terminal evidence and database state. '
-        'Deduplicate this event ID. Use previously authorized scope and remaining budgets; this event grants no new authority. '
+        'Deduplicate this event ID. Follow the authorized backlog and selected run controls; this event grants no new authority. '
         'Missing evidence or failed/uncertain delivery is a blocker; do not automatically relaunch the import.'
     )
     receipt_path = directory / 'callback.json'
@@ -445,7 +460,7 @@ def parse_arguments(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     mode.add_argument('--preflight', action='store_true', help='native exec only: harmless 12-second targeted terminal callback test')
     parser.add_argument('--owner-session', help='actual visible dashboard session owning background exec')
     parser.add_argument('--completion-receipt', type=Path, default=RECEIPT, help='private witnessed-completion receipt')
-    parser.add_argument('--max-hours', type=int, help='original remaining deadline, 1..168 hours')
+    parser.add_argument('--max-hours', type=int, help='optional manual deadline, 1..168 hours; omitted means continuous watch')
     for flag in ('--check', '--preflight', '--owner-session', '--completion-receipt', '--max-hours'):
         if sum(value == flag or value.startswith(flag + '=') for value in wrapper_args) > 1:
             parser.error(f'duplicate wrapper option {flag}')
@@ -456,8 +471,8 @@ def parse_arguments(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         parser.error('--check/--preflight do not accept ingestion arguments')
     if options.preflight and (options.max_hours is not None or any(value == '--completion-receipt' or value.startswith('--completion-receipt=') for value in wrapper_args)):
         parser.error('--preflight does not accept an ingestion deadline or completion receipt')
-    if not options.check and not options.preflight and (options.max_hours is None or not run_args):
-        parser.error('provide --owner-session SESSION --max-hours 1..168 -- <managed run arguments with explicit budgets>')
+    if not options.check and not options.preflight and not run_args:
+        parser.error('provide --owner-session SESSION [--max-hours 1..168] -- <managed run arguments>')
     return options, run_args
 
 
@@ -468,6 +483,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError('launch through OpenClaw exec background=true; a terminal or detached shell has no native completion owner')
         owner = validate_owner(options.owner_session) if options.owner_session or not options.check else None
         budgets = validate_budgets(run_args) if not options.check and not options.preflight else {}
+        if not options.check and not options.preflight:
+            run_args = default_unlimited(run_args, budgets)
         native_configuration(Path.home() / '.openclaw/openclaw.json')
         gateway = gateway_identity()
         if owner and not options.preflight:
@@ -486,7 +503,7 @@ def main(argv: list[str] | None = None) -> int:
         command = [str(ROOT / '.venv/bin/python'), str(ROOT / 'scripts/project-env.py'),
                    '--cwd', str(MAP), '--shell-only', *requirements, '--',
                    'pnpm', '--silent', '--filter', '@lib/db-map', 'ingest:supervise', 'watch',
-                   '--max-hours', str(options.max_hours), '--', *run_args]
+                   *(['--max-hours', str(options.max_hours)] if options.max_hours is not None else []), '--', *run_args]
         return run_import(command, run_args, owner, gateway, directory)
     except (OSError, ValueError, TypeError, subprocess.SubprocessError) as exc:
         # Do not echo raw launchctl/ps output or credential-bearing child environments.
