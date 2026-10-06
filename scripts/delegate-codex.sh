@@ -17,7 +17,7 @@ if [[ ! -f "$prompt" ]]; then
   exit 64
 fi
 
-codex_bin=/Applications/ChatGPT.app/Contents/Resources/codex
+codex_bin="$HOME/.codex/packages/standalone/current/codex"
 if [[ ! -x "$codex_bin" ]]; then
   echo 'Codex CLI is unavailable at the configured path.' >&2
   exit 69
@@ -40,7 +40,11 @@ echo "Codex Sol (high) started: $run_id"
 echo "Events: $event_log"
 
 set +e
-"$python_bin" "$root/scripts/project-env.py" --cwd "$repo" -- "$codex_bin" exec \
+env_args=(--cwd "$repo")
+if [[ "$(git -C "$repo" remote get-url origin)" =~ paulshorey/map(\.git)?$ ]]; then
+  env_args+=(--shell-only)
+fi
+"$python_bin" "$root/scripts/project-env.py" "${env_args[@]}" -- "$codex_bin" exec \
   --cd "$repo" \
   --model gpt-6-sol \
   -c 'model_reasoning_effort="high"' \

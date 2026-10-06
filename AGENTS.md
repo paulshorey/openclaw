@@ -17,10 +17,10 @@ Read `README.md` for the setup and file map. Keep operating rules in the coordin
 
 The configured OpenClaw workspace is `runtime/coordinator/`. Leave agent `cwd` unset so its default execution directory is that workspace. OpenClaw loads bootstrap files there. Codex may read this root file while engineering the repository; OpenClaw's own `AGENTS.md` comes from its nested workspace. Do not assume OpenClaw discovers parent instructions.
 
-For commands needing credentials from another project, use `.venv/bin/python scripts/project-env.py --cwd <project-or-app-path> -- <command>`. Choose the actual project or nested app path. `--check` reports names and availability without values; `--require NAME` adds a required shell variable absent from dotenv files. Ordinary `git`, `rg`, and `gh` inspection does not need the runner. Respect the target repository's instructions. Examples:
+For commands needing credentials from another project, use `.venv/bin/python scripts/project-env.py --cwd <project-or-app-path> -- <command>`. Choose the actual project or nested app path. `--shell-only` skips dotenv loading and is required for map. `--check` reports names and availability without values; `--require NAME` adds a required shell variable absent from dotenv files. Ordinary `git`, `rg`, and `gh` inspection does not need the runner. Respect the target repository's instructions. Examples:
 
 ```sh
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map -- pnpm --filter @lib/db-map ingest:status
+.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only -- pnpm --filter @lib/db-map ingest:status
 .venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/livx -- pnpm --filter apps/client-app dev
 ```
 

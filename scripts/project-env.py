@@ -70,10 +70,10 @@ def scope_directories(root: Path, cwd: Path) -> list[Path]:
     return directories
 
 
-def build_environment(cwd: Path, extra_required: set[str]) -> tuple[dict[str, str], list[Path], set[str]]:
+def build_environment(cwd: Path, extra_required: set[str], shell_only: bool = False) -> tuple[dict[str, str], list[Path], set[str]]:
     root = project_root(cwd)
     directories = scope_directories(root, cwd)
-    env_files = [directory / name for directory in directories for name in (".env", ".env.local") if (directory / name).is_file()]
+    env_files = [] if shell_only else [directory / name for directory in directories for name in (".env", ".env.local") if (directory / name).is_file()]
     example_files = [directory / name for directory in directories for name in (".env.example", ".env.local.example") if (directory / name).is_file()]
 
     declared = set(extra_required)
@@ -102,6 +102,7 @@ def main() -> int:
     parser.add_argument("--cwd", required=True, type=Path, help="project working directory")
     parser.add_argument("--require", action="append", default=[], metavar="NAME", help="additional expected variable name")
     parser.add_argument("--check", action="store_true", help="print names and missing variables only")
+    parser.add_argument("--shell-only", action="store_true", help="use injected/login-shell variables and example declarations; do not read dotenv files")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     cwd = args.cwd.expanduser().resolve()
@@ -112,7 +113,7 @@ def main() -> int:
         parser.error("--require accepts environment variable names only")
 
     try:
-        env, files, declared = build_environment(cwd, required)
+        env, files, declared = build_environment(cwd, required, args.shell_only)
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
         print(f"Project environment could not be prepared: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 78

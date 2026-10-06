@@ -10,7 +10,7 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 - Provider plugin: `@openclaw/fireworks-provider`
 - Model: `fireworks/accounts/fireworks/models/deepseek-v4p1-flash`
 - `gh`: logged in as `paulshorey`
-- Codex: `/Applications/ChatGPT.app/Contents/Resources/codex` (ChatGPT login)
+- Codex: `~/.codex/packages/standalone/current/codex` (ChatGPT login)
 - Memory search: keyword only (`memory.search.provider: none`; host OpenAI key invalid for embeddings)
 - No sandbox: Gateway can reach all of `~/git` with user permissions.
 
@@ -55,6 +55,10 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 - One-off task / run status → `runtime/coordinator/state/`
 - Edit templates, not runtime copies, then deploy. Deploy does not start the Gateway.
 
+### Map import runner
+
+`./scripts/run-map-import.sh --check` checks native completion configuration without starting ingestion. The coordinator must also verify an actual harmless background completion before its first unattended import. Launch the wrapper through OpenClaw native `exec` with `background=true` and `timeoutSeconds=0`; the map supervisor enforces a finite 1–168-hour deadline. Pass `--max-hours 48 --` and the exact managed run arguments with explicit `--max-llm-requests`, `--max-cost-usd`, and `--geocode-limit`. The wrapper refuses ordinary terminals and uses shell-only project credentials. Keep scope/budgets/handles/event IDs in private `state/map-imports.md`; PostgreSQL remains progress truth. Paid launches wait for recorded aggregate provider authorization. It never invokes a Codex model while waiting.
+
 ### Context and run lifetime
 
 OpenClaw injects the runtime `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, in that order, into both the launcher and visible heartbeat session. AGENTS owns the procedure; SOUL covers role/style; USER records preferences. The heartbeat prompt only launches the conversation and selects the procedure. The coordinator then reads `state/ACTIVE.md`, the repository inventory, and relevant linked evidence. Historical state/log directories are not loaded wholesale.
@@ -76,13 +80,14 @@ openclaw config get agents.entries.main.workspace
 ## Project env runner
 
 ```sh
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --check   # names only
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map -- pnpm --filter @lib/db-map ingest:status
+.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only --check   # names only
+.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only -- pnpm --filter @lib/db-map ingest:status
 .venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/example/apps/web -- npm run dev
 ```
 
 - Imports login-shell vars named in the project's env files/examples, then `.env` + `.env.local` from Git root down to `--cwd`.
 - Deeper dir wins; `.env.local` wins within a dir; blanks can be filled by other sources.
+- `--shell-only`: do not read `.env`/`.env.local`; use injected/login-shell values and example declarations. Required for map.
 - `--require NAME`: require an undeclared shell var. `--check` flags declared-but-unset (may be optional).
 - Use for anything needing project config (python, node, db, containers, dev servers, deploy CLIs). Not needed for `git`/`rg`/`gh`.
 - `delegate-codex.sh` wraps with this automatically; pass the nested app path when relevant.
@@ -144,8 +149,8 @@ The Gateway reloads prompt/skill configuration; runtime templates are used on su
 ## Work cycle
 
 - Hourly: resume ledger work; check the managed repositories' branches, PRs, reviews, CI, and issues; delegate selected tasks to Sol; record priorities and deferrals; no duplicates.
-- Sol does all repo/GitHub mutations, including branch cleanup (unmerged → review).
-- Quiet: consider one eligible JSON/CSV source in `~/git/map`. Sol makes the orchestration decision and follows map's `AGENTS.md`, `data/poi-ingestion.md`, and `data/ingestion-agents.md`; a long import uses the runbook's cheap runner and model-free supervisor. Verify DB completion; no overlapping imports.
+- Sol handles code/GitHub mutations and process repairs. The coordinator may launch the reviewed native map runner and make audited inventory metadata edits as described in its AGENTS template.
+- Quiet: reconcile and advance one eligible file from map's `ingest:queue --json`. OpenClaw is the cheap runner; Node handles waiting and hourly health. Native background exec completion continues the owning conversation. Delegate blockers to Sol, preserve aggregate budgets, and verify whole-file database completion before advancing. Read map's `data/ingestion-agents.md#native-openclaw-runner`.
 
 ## New Mac setup
 

@@ -11,7 +11,7 @@ echo 'Model:'
 openclaw config get agents.defaults.model.primary 2>&1
 echo
 echo 'Codex authentication:'
-/Applications/ChatGPT.app/Contents/Resources/codex login status 2>&1
+"$HOME/.codex/packages/standalone/current/codex" login status 2>&1
 echo
 echo 'GitHub authentication:'
 gh auth status 2>&1 | sed -E 's/(Token: ).*/\1[redacted]/'
@@ -51,6 +51,6 @@ done < "$inventory"
 echo
 echo 'Map ingestion process inventory:'
 if [[ -d /Users/pshorey/git/map ]]; then
-  "$root/.venv/bin/python" "$root/scripts/project-env.py" --cwd /Users/pshorey/git/map -- pnpm --silent --filter @lib/db-map ingest:control list --json 2>&1 | head -80
+  "$root/.venv/bin/python" "$root/scripts/project-env.py" --cwd /Users/pshorey/git/map --shell-only -- pnpm --silent --filter @lib/db-map ingest:control list --json 2>&1 | head -80
 fi
 exit "$snapshot_failed"
