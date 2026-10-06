@@ -30,6 +30,7 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 | `scripts/configure.sh`                       | Applies model/workspace/heartbeat/Gateway settings, installs LaunchAgent (may start Gateway) |
 | `scripts/delegate-codex.sh`                  | Runs Codex Sol in a repo with project env; logs to `logs/`                                   |
 | `scripts/project-env.py`, `requirements.txt` | Project-scoped env runner + its dependency                                                   |
+| `scripts/run-map-import.sh`, `scripts/run-map-import.py` | Native import wrapper and completion/ownership/budget admission checks                       |
 | `scripts/status.sh`                          | Read-only Gateway/auth/PR/ingestion snapshot                                                 |
 | `scripts/configure-ui-workflow.py`           | Applies dashboard heartbeat routing, disables Telegram, removes its active bot token         |
 
@@ -57,13 +58,37 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 
 ### Map import runner
 
-`./scripts/run-map-import.sh --check` checks native completion configuration without starting ingestion. The coordinator must also verify an actual harmless background completion before its first unattended import. Launch the wrapper through OpenClaw native `exec` with `background=true` and `timeoutSeconds=0`; the map supervisor enforces a finite 1–168-hour deadline. Pass `--max-hours 48 --` and the exact managed run arguments with explicit `--max-llm-requests`, `--max-cost-usd`, and `--geocode-limit`. The wrapper refuses ordinary terminals and uses shell-only project credentials. Keep scope/budgets/handles/event IDs in private `state/map-imports.md`; PostgreSQL remains progress truth. Paid launches wait for recorded aggregate provider authorization. It never invokes a Codex model while waiting.
+`./scripts/run-map-import.sh --check` checks completion configuration and returns the current Gateway PID/start time without starting ingestion. Use the owner's effective heartbeat `isolatedSession=false` and `target="owner"` for same-conversation delivery with internal dashboard projection. Isolated routing sends exec completion to a separate heartbeat session and loses the original conversation/process scope; `target="none"` removes raw completion details from the generated prompt and disables that dashboard projection. The wrapper rejects both failure settings. This configuration-only check explicitly does not prove wake-up.
+
+The installed Gateway can defer ordinary native exec events until the next one-hour heartbeat. This runner retains native background exec ownership and adds a separate terminal integration: one supported `openclaw system event --session-key <owner> --mode now --text <compact-terminal-event> --json` after durable terminal evidence. The callback targets the owning dashboard directly; waiting and health checks remain ordinary code. It does not detach the import, start a separate server, invoke Codex while healthy, or send an external message.
+
+Before unattended imports, run `./scripts/run-map-import.sh --preflight --owner-session <actual-dashboard-session-key>` through native `exec` with `background=true`, `timeoutSeconds=0`, then end the turn. This mode accepts no import arguments, deadline, credentials or existing completion receipt. It waits a fixed 12 seconds in ordinary code, writes private preflight terminal evidence with a unique marker, and attempts one targeted wake-now callback. Verify the **automatic continuation with that exact marker in the same dashboard conversation after the initiating turn ends**. A CLI acknowledgement proves acceptance only; it does not prove that a model turn ran. Hidden `agent:main:subagent:...` owners are rejected. Repeat actual proof after a Gateway restart or notification/configuration change.
+
+The owning conversation must use normal internal dashboard chat delivery. A bare `sessions.create` followed by CLI `openclaw agent` can persist `delivery.kind="none"`; its dashboard-shaped key is insufficient proof. For an engineering preflight, use normal Gateway `chat.send` with the owner key, a fresh idempotency key, `deliver:false` and no originating/destination fields, or create a visible conversation with its initial task. Verify the automatic continuation rather than inferring delivery from metadata.
+
+Record `runtime/coordinator/state/map-native-completion.json` only after witnessing that targeted callback. It uses `schema_version: 1`, `notification_kind: "terminal_callback"`, the exact `owner_session`, `gateway` object from `--check` (`pid` and timezone-aware `started_at`), timezone-aware `completed_at` and later `checked_at`, the actual native exec `native_process_id`, the preflight marker as `completion_event_id`, `completion_status: "succeeded"`, and an absolute `evidence_path` to a nonempty private transcript/note in `runtime/coordinator/` documenting the observed continuation. The preflight never creates this proof automatically. Do not fabricate a receipt, use acceptance as delivery proof, or borrow another conversation's evidence. Check it with `./scripts/run-map-import.sh --check --owner-session <actual-dashboard-session-key>`. The wrapper rejects legacy native-exit-only proof, missing evidence, another owner, stale PID/start time, hidden sessions and invalid timestamps. A current private alternate receipt can be passed with `--completion-receipt /absolute/private/path`.
+
+Launch through OpenClaw native `exec` with `background=true` and `timeoutSeconds=0`. Pass `--owner-session <actual-dashboard-session-key> --max-hours <remaining-approved-hours> --`, then the exact managed run arguments and one each of `--max-llm-requests`, `--max-cost-usd`, and `--geocode-limit`. Budgets must be finite nonnegative values; request/geocoder counts must be integers. The map supervisor enforces the finite 1–168-hour deadline. The wrapper refuses ordinary terminals, uses shell-only project credentials, and requires `DB_MAP_URL`. It requires `FIREWORKS_API_KEY` except for an explicit **new** file/category run with exactly one `--from report` or `--from verify`, all three budgets zero, and no resume, conflicting stage options or consolidation. A resume preserves its original stage scope and cannot be converted into a report suffix by adding `--from`. Keep scope/budgets/handles/event IDs in private `state/map-imports.md`; PostgreSQL remains progress truth. Paid launches wait for recorded aggregate provider authorization. Waiting never invokes a Codex model.
+
+Zero budgets alone do not make an arbitrary file or resume provider-free: request/cost limits bound normalization, and `--geocode-limit` bounds geocoder work; embedding, matching and fusion are not hard-capped by those flags. Record separate authorization for those stages before a full run. A new `source.json --category campground --from report --max-llm-requests 0 --max-cost-usd 0 --geocode-limit 0` is a provider-free suffix, but can still perform deterministic extraction and database writes. Its result is not proof of whole-file import completion. Require the file's `coverage="complete"` from `ingest:inventory --json` and `action="complete"` from `ingest:queue --json`; raw `ingestion_files.status="complete"` means extraction completed.
+
+The wrapper owns one foreground `project-env.py → ingest:supervise watch` child, forwards its launch/terminal stdout, and retains bounded receipt capture plus raw stdout/stderr privately under `runtime/coordinator/logs/map-import-runner/`. Before a normal terminal callback, it verifies the canonical map `.ingest-jobs/<uuid>/job.json` and `result.json`, exact scope, event/job/run/execution identities, and terminal outcome. The callback uses the exact `ingestion:<job-uuid>:terminal` ID; deduplicate a later delayed native event against it. Pre-job failures and invalid journals send a distinct `map-import-wrapper:<uuid>:terminal` blocker with private wrapper evidence, without inventing a map run/job or advancing the queue. Callback claims and `callback.json` preserve the actual acknowledgement or failed/uncertain delivery. There are no automatic callback retries or import relaunches. Callback failure returns a blocker even when map succeeded; inspect owner history and evidence before any repair or queue advance.
+
+Map now defaults to Fireworks DeepSeek V4.1 Flash with bounded thinking. Before provider work, check required shell variables through the env runner and verify the effective provider/model/endpoint against map's [Fireworks runbook](/Users/pshorey/git/map/data/poi-ingestion.md). Stale DeepInfra overrides need an engineering repair. Sharing OpenClaw's key does not establish map's model compatibility or successful ingestion; retain bounded pipeline test evidence separately from native completion proof.
+
+Provider-free wrapper checks:
+
+```sh
+.venv/bin/python scripts/test-project-env.py
+.venv/bin/python scripts/test-run-map-import.py
+bash -n scripts/run-map-import.sh
+```
 
 ### Context and run lifetime
 
 OpenClaw injects the runtime `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, in that order, into both the launcher and visible heartbeat session. AGENTS owns the procedure; SOUL covers role/style; USER records preferences. The heartbeat prompt only launches the conversation and selects the procedure. The coordinator then reads `state/ACTIVE.md`, the repository inventory, and relevant linked evidence. Historical state/log directories are not loaded wholesale.
 
-The built-in `[Subagent Context]` wrapper comes from OpenClaw's `buildSubagentTaskMessage` implementation. `depth 1/5` is nesting depth, not progress. `visible=true` keeps a saved, replyable conversation after its run ends. It does not keep a model or worker running indefinitely: later messages/completions start another turn. Idle conversations retain history without generating tokens. The Gateway/scheduler service remains running independently.
+The built-in `[Subagent Context]` wrapper comes from OpenClaw's `buildSubagentTaskMessage` implementation. `depth 1/5` is nesting depth, not progress. `sessions_spawn` uses `runtime="subagent"` even for `visible=true` dashboard conversations; check the actual session key. A visible `agent:main:dashboard:...` session keeps a saved, replyable conversation and can receive automatic native background-exec continuation after its run ends. A hidden `agent:main:subagent:...` session cannot provide that owner. Visibility does not keep a model or worker running indefinitely: later messages/completions start another turn. Idle conversations retain history without generating tokens. The Gateway/scheduler service remains running independently.
 
 Heartbeat passes aim for five minutes with a 15-minute hard execution limit. Required decisions are written to ACTIVE.md and asked in the final reply; dependent work stays pending until an actual answer arrives. Heartbeats do not block on `ask_user`, whose wait consumes the run budget and expires. Enable **Agent finished** notifications to see these summaries/questions; they are ordinary conversation messages, not pending question cards. Background specialist work uses completion events in its owning conversation.
 
@@ -80,7 +105,7 @@ openclaw config get agents.entries.main.workspace
 ## Project env runner
 
 ```sh
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only --check   # names only
+.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only --check --require DB_MAP_URL --require FIREWORKS_API_KEY   # names only
 .venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only -- pnpm --filter @lib/db-map ingest:status
 .venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/example/apps/web -- npm run dev
 ```
@@ -88,7 +113,7 @@ openclaw config get agents.entries.main.workspace
 - Imports login-shell vars named in the project's env files/examples, then `.env` + `.env.local` from Git root down to `--cwd`.
 - Deeper dir wins; `.env.local` wins within a dir; blanks can be filled by other sources.
 - `--shell-only`: do not read `.env`/`.env.local`; use injected/login-shell values and example declarations. Required for map.
-- `--require NAME`: require an undeclared shell var. `--check` flags declared-but-unset (may be optional).
+- `--require NAME`: import an undeclared shell var and refuse execution when that explicit requirement is absent/empty. `--check` reports all missing declarations but returns failure only for missing explicit requirements; optional `.env.example` names remain optional.
 - Use for anything needing project config (python, node, db, containers, dev servers, deploy CLIs). Not needed for `git`/`rg`/`gh`.
 - `delegate-codex.sh` wraps with this automatically; pass the nested app path when relevant.
 - `map` root uses shell-provided credentials; `.env.example` is reference only. `map/apps/map` unset: `NEXT_PUBLIC_API_URL`, `THUNDERFOREST_API_KEY` (as of 2026-09-23).
@@ -109,7 +134,7 @@ openclaw dashboard            # http://127.0.0.1:18789/
 
 - Gateway currently **running** as a LaunchAgent. Loopback only.
 - LaunchAgent runs only while logged in and awake.
-- Heartbeat: every `1h` (`agents.defaults.heartbeat.every`); lives in the scheduler, no `HEARTBEAT.md`. Each isolated launcher creates one persistent dashboard conversation with `sessions_spawn visible=true`, in the `Heartbeats` group. The new conversation runs the bounded coordination pass and always leaves a readable summary, including when nothing changed. The launcher records a receipt and returns `NO_REPLY` after dispatch.
+- Heartbeat: every `1h` (`agents.defaults.heartbeat.every`); lives in the scheduler, no `HEARTBEAT.md`. Keep `agents.defaults.heartbeat.isolatedSession=false` and `target="owner"`: exec-event wakes inherit these settings. Isolation routes events into an owner `:heartbeat` suffix, and `target="none"` removes the completion details from the model prompt. Owner routing permits the dashboard conversation to receive its own event; external Telegram delivery remains disabled. Each scheduled launcher creates one persistent dashboard conversation with `sessions_spawn visible=true`, in the `Heartbeats` group. The new conversation runs the bounded coordination pass and always leaves a readable summary, including when nothing changed. The launcher records a receipt and returns `NO_REPLY` after dispatch.
 - Dashboard auth is tied to the browser profile that ran `openclaw dashboard`.
 
 ## Dashboard and mobile conversations

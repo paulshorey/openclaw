@@ -36,10 +36,17 @@ def main() -> None:
     patch = {
         "agents": {"defaults": {"heartbeat": {
             "every": "1h",
-            "target": "none",
+            # `none` also hides exec-completion details from the model. Owner
+            # routing lets internal dashboard sessions receive their own event;
+            # external channels remain disabled below.
+            "target": "owner",
             "to": None,
             "accountId": None,
-            "isolatedSession": True,
+            # Exec-event wakes inherit heartbeat settings. Isolation redirects a
+            # dashboard owner's completion into a :heartbeat suffix, where the
+            # original native process scope is unavailable. The scheduled prompt
+            # already creates its own dated visible dashboard conversation.
+            "isolatedSession": False,
             "prompt": (ROOT / "config/heartbeat-prompt.txt").read_text().strip(),
         }}, "entries": {"main": {"skills": json.loads(
             (ROOT / "config/coordinator-skills.json").read_text()
