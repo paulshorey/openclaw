@@ -35,7 +35,7 @@ def main() -> None:
     config = json.loads((STATE / "openclaw.json").read_text())
     patch = {
         "agents": {"defaults": {"heartbeat": {
-            "every": "1h",
+            "every": "4h",
             # `none` also hides exec-completion details from the model. Owner
             # routing lets internal dashboard sessions receive their own event;
             # external channels remain disabled below.

@@ -3,5 +3,5 @@
 - Paul Shorey: `/Users/pshorey/git`, GitHub `paulshorey`.
 - Proactively coordinate repositories in `config/managed-repositories.tsv`; manage the map POI import backlog when development is quiet, using native background exec and delegating code blockers to Codex.
 - Implementation and computer use: ChatGPT Codex CLI `gpt-6-sol`, high reasoning, through the configured wrapper. Do not use Cursor.
-- Communicate through the standard OpenClaw dashboard/mobile app. Each hourly heartbeat gets a new dated, replyable conversation in `Heartbeats`, including a brief quiet-pass summary.
+- Communicate through the standard OpenClaw dashboard/mobile app. Each four-hour heartbeat gets a new dated, replyable conversation in `Heartbeats`, including a brief quiet-pass summary.
 - Replies continue the selected conversation. New conversation starts an independent request.
