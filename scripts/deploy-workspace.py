@@ -2,6 +2,7 @@
 """Deploy reviewed coordinator instructions without touching private runtime data."""
 
 import hashlib
+import argparse
 import json
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "config" / "coordinator"
 DEST = ROOT / "runtime" / "coordinator"
 MANIFEST = DEST / ".deployed-files.json"
-NAMES = ("MAP-IMPORTS.md", "AGENTS.md", "SOUL.md", "IDENTITY.md", "USER.md")
+NAMES = ("MAP-IMPORTS.md", "CODEX-CLOUD.md", "AGENTS.md", "SOUL.md", "IDENTITY.md", "USER.md")
 
 
 def digest(data: bytes) -> str:
@@ -32,8 +33,12 @@ def atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Check conflicts without writing runtime files")
+    args = parser.parse_args()
     os.umask(0o077)
-    DEST.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not args.check:
+        DEST.mkdir(parents=True, exist_ok=True, mode=0o700)
     if DEST.is_symlink():
         print(f"Refusing symlinked workspace: {DEST}", file=sys.stderr)
         return 1
@@ -56,6 +61,9 @@ def main() -> int:
         print("Runtime files changed since deployment: " + ", ".join(conflicts), file=sys.stderr)
         print("Review and reconcile them with config/coordinator before retrying.", file=sys.stderr)
         return 1
+    if args.check:
+        print("Coordinator deployment conflict check passed; no files changed.")
+        return 0
     for name, (target, data, source_hash) in planned.items():
         if not target.exists() or digest(target.read_bytes()) != source_hash:
             atomic_write(target, data)

@@ -1,38 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 export PATH="/opt/homebrew/bin:$PATH"
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-workspace="$root/runtime/coordinator"
-openclaw_bin=/opt/homebrew/bin/openclaw
-
-if [[ ! -x "$openclaw_bin" ]]; then
-  echo 'OpenClaw is missing; install it with Node 26 first.' >&2
-  exit 69
-fi
-if [[ ! -f "$HOME/.openclaw/.env" ]] || ! grep -q '^FIREWORKS_API_KEY=' "$HOME/.openclaw/.env"; then
-  echo 'Put FIREWORKS_API_KEY in ~/.openclaw/.env before configuring.' >&2
-  exit 78
-fi
-
-if [[ ! -x "$root/.venv/bin/python" ]]; then
-  /opt/homebrew/bin/python3 -m venv "$root/.venv"
-fi
-if ! "$root/.venv/bin/python" -c 'import dotenv' >/dev/null 2>&1; then
-  "$root/.venv/bin/python" -m pip install -r "$root/requirements.txt"
-fi
-
-if ! "$openclaw_bin" plugins inspect fireworks --json >/dev/null 2>&1; then
-  "$openclaw_bin" plugins install @openclaw/fireworks-provider
-fi
-"$root/scripts/deploy-workspace.py"
-"$openclaw_bin" config set agents.defaults.workspace "$workspace"
-"$openclaw_bin" config set agents.entries.main.workspace "$workspace"
-"$openclaw_bin" config set agents.defaults.model.primary fireworks/accounts/fireworks/models/deepseek-v4p1-flash
-python3 "$root/scripts/configure-ui-workflow.py"
-"$openclaw_bin" config set memory.search.provider none
-"$openclaw_bin" config set env.shellEnv.enabled true
-"$openclaw_bin" config set gateway.bind loopback
-"$openclaw_bin" config validate
-"$openclaw_bin" gateway install
-"$openclaw_bin" gateway status
+python_bin="$root/.venv/bin/python"
+[[ -x "$python_bin" ]] || python_bin=/opt/homebrew/bin/python3
+mode=${1:---dry-run}
+if [[ $# -gt 0 ]]; then shift; fi
+case "$mode" in
+  --dry-run) exec "$python_bin" "$root/scripts/configure-agent-runtime.py" "$@" ;;
+  --validate) exec "$python_bin" "$root/scripts/configure-agent-runtime.py" --validate "$@" ;;
+  --prepare)
+    [[ $# -eq 0 ]] || { echo '--prepare takes no arguments' >&2; exit 64; }
+    if [[ ! -x "$root/.venv/bin/python" ]]; then /opt/homebrew/bin/python3 -m venv "$root/.venv"; fi
+    "$root/.venv/bin/python" -m pip install -r "$root/requirements.txt"
+    policy_values=()
+    while IFS= read -r value; do policy_values+=("$value"); done < <("$python_bin" -c 'import json,sys; c=json.load(open(sys.argv[1])); print(c["openclaw_version"]); print(c["plugin_package"]); print(c["cli_binary"]); print(c["cli_version"])' "$root/config/codex-runtime.json")
+    /opt/homebrew/bin/openclaw update --tag "${policy_values[0]}" --no-restart --yes
+    /opt/homebrew/bin/openclaw plugins install "${policy_values[1]}" --pin --force --accept-capabilities --no-enable
+    cli_install_prefix=$(dirname -- "$(dirname -- "$(dirname -- "${policy_values[2]}")")")
+    npm install --prefix "$cli_install_prefix" --no-audit --no-fund "@openai/codex@${policy_values[3]}"
+    ;;
+  --apply)
+    "$python_bin" "$root/scripts/configure-agent-runtime.py" --apply "$@"
+    "$python_bin" "$root/scripts/configure-ui-workflow.py"
+    "$python_bin" "$root/scripts/deploy-workspace.py"
+    /opt/homebrew/bin/openclaw config validate
+    ;;
+  --install-service) exec /opt/homebrew/bin/openclaw gateway install "$@" ;;
+  --start) exec /opt/homebrew/bin/openclaw gateway start "$@" ;;
+  --restart) exec /opt/homebrew/bin/openclaw gateway restart "$@" ;;
+  *) echo 'Usage: configure.sh [--dry-run|--validate|--prepare|--apply|--install-service|--start|--restart]' >&2; exit 64 ;;
+esac

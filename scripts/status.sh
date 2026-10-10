@@ -4,20 +4,20 @@ set -u
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 inventory="$root/config/managed-repositories.tsv"
+snapshot_failed=0
 echo 'OpenClaw gateway:'
 openclaw gateway status 2>&1 | head -25
 echo
-echo 'Model:'
-openclaw config get agents.defaults.model.primary 2>&1
+echo 'Role policy and effective configuration:'
+"$root/.venv/bin/python" "$root/scripts/agent-policy.py" --check || snapshot_failed=1
 echo
-echo 'Codex authentication:'
-"$HOME/.codex/packages/standalone/current/codex" login status 2>&1
+echo 'Tracked Codex Cloud work:'
+"$root/.venv/bin/python" "$root/scripts/codex-cloud.py" list || snapshot_failed=1
 echo
 echo 'GitHub authentication:'
 gh auth status 2>&1 | sed -E 's/(Token: ).*/\1[redacted]/'
 echo
 echo 'Managed repository snapshot:'
-snapshot_failed=0
 while IFS=$'\t' read -r repo checkout || [[ -n "${repo:-}" ]]; do
   [[ -z "${repo:-}" || "$repo" == \#* ]] && continue
   if [[ -z "${checkout:-}" ]] || ! git -C "$checkout" rev-parse --show-toplevel >/dev/null 2>&1; then
@@ -51,6 +51,17 @@ done < "$inventory"
 echo
 echo 'Map ingestion process inventory:'
 if [[ -d /Users/pshorey/git/map ]]; then
-  "$root/.venv/bin/python" "$root/scripts/project-env.py" --cwd /Users/pshorey/git/map --shell-only -- pnpm --silent --filter @lib/db-map ingest:control list --json 2>&1 | head -80
+  if supervisor=$("$root/.venv/bin/python" "$root/scripts/project-env.py" --cwd /Users/pshorey/git/map --shell-only -- pnpm --silent --filter @lib/db-map ingest:supervise list 2>&1); then
+    printf '%s\n' "$supervisor" | head -80
+  else
+    printf 'Map supervisor discovery failed: %s\n' "$supervisor"
+    snapshot_failed=1
+  fi
+  if controls=$("$root/.venv/bin/python" "$root/scripts/project-env.py" --cwd /Users/pshorey/git/map --shell-only -- pnpm --silent --filter @lib/db-map ingest:control list --json 2>&1); then
+    printf '%s\n' "$controls" | head -80
+  else
+    printf 'Map control discovery failed: %s\n' "$controls"
+    snapshot_failed=1
+  fi
 fi
 exit "$snapshot_failed"

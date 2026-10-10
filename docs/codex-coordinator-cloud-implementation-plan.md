@@ -1,16 +1,16 @@
 # Codex coordinator and Cloud implementation plan
 
-Date: 2026-10-08
+Date: 2026-10-08; desktop direction updated 2026-10-10
 
-Status: Approved. No runtime migration has been performed.
+Status: Implementation in progress on `codex-coordinator`. The coordinator cutover and guarded local coding are implemented; evidence and remaining limits are recorded in section 16. Cloud dispatch is disabled. Section 17 and `CODEX-DESKTOP.md` supersede the proposed Cloud destination with the requested desktop route, pending a design choice and native dispatch pilot.
 
 ## 1. Recommendation and intended result
 
 Move the OpenClaw coordinator from Fireworks DeepSeek to the official OpenClaw Codex app-server runtime on this Mac, authenticated through Paul's ChatGPT account. Start with `gpt-6.1-sol`, High reasoning, and Standard speed. Keep coordinator, delegated local coding, and Cloud coding settings independent.
 
-Allow the coordinator to implement small, authorized fixes directly in an isolated worktree. Use a separate local coding process for work requiring this Mac's tools, credentials, or a longer execution window. Use Codex Cloud for suitable repository work that Paul should be able to continue directly in Cloud. Keep map ingestion and its completion callbacks on the local OpenClaw Gateway.
+Allow the coordinator to implement small, authorized fixes directly in an isolated worktree. The implemented separate local coding process remains available under its existing authority. Paul's updated preferred destination for complex delegation is a new native desktop project chat; prove that route before enabling it. Keep map ingestion and its completion callbacks on the local OpenClaw Gateway. Cloud implementation sections below preserve the original design and evidence; they do not authorize enabling it as a substitute for the desktop request.
 
-The Cloud integration has a supported CLI entry point and the installed CLI successfully authenticates to the Cloud task listing service. It is feasible to build a submission and monitoring adapter. Full compatibility with Paul's intended Cloud interface still needs one controlled task submission and human follow-up test. That is a release gate, not an assumption.
+The original Cloud proposal has a supported CLI entry point, and the installed CLI successfully authenticates to the Cloud task listing service. Its submission and monitoring adapter is implemented but disabled. Remote model enforcement and a controlled submission/human follow-up pilot remain unverified. Those requirements do not need to be completed to investigate the preferred desktop replacement.
 
 This document supersedes the earlier conversational plan where details differ. It is a proposal for implementation; its configuration examples are project policy, not commands to run against the live installation.
 
@@ -427,7 +427,7 @@ Do not solve a conflict by moving private state, copying the README into prompts
 
 Cloud submission authority should be concrete: user-requested tasks and reviewed existing development responsibilities may dispatch within their scope. Unrelated feature requests, issue text, or a discovered old branch do not independently authorize new work. Carry pending product/release/destructive decisions into any delegated task.
 
-For private durable files, use mode 0600 and directories 0700. Treat task prompts and diffs as potentially private source material. Cloud submission uses a query argument in the installed CLI, so it may be visible to local process inspection; never place credentials or private raw log dumps in it. Inspect processes by PID/parent/status/executable only. Private prompt-file retention does not eliminate the remote CLI's argument exposure.
+For private durable files, use mode 0600 and directories 0700. Treat task prompts and diffs as potentially private source material. Implementation verified from upstream CLI 0.160.0 source that `cloud exec ... -` reads the prompt from stdin. Use stdin so private prompts do not appear in argv. Never place credentials or private raw log dumps in a prompt. Inspect processes by PID/parent/status/executable only.
 
 Keep Cloud state, map state, local process state, and required user decisions distinguishable in `ACTIVE.md`. Use atomic ledger transactions and reread-before-patch for shared Markdown state. Do not let a late completion overwrite newer user direction or another conversation's ownership.
 
@@ -479,7 +479,7 @@ Gate: routine dispatch and recovery are reliable, unchanged statuses stay quiet,
 
 ## 12. Planned file and configuration changes
 
-All checkout paths in this table are relative to `/Users/pshorey/git/openclaw/`. Items marked “new” do not exist yet and are implementation deliverables.
+All checkout paths in this table are relative to `/Users/pshorey/git/openclaw/`. “New” describes files introduced by this implementation; current delivery and live evidence are recorded in section 16.
 
 | File or surface                                        | Planned change                                                                                                             |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
@@ -565,3 +565,50 @@ These are technical gates, not reasons to stop the current planning work or ask 
 Resolve each with a dated capability result and pilot evidence. Only ask for a user decision when the remaining issue depends on intent, account interaction, a deliberate policy change, or authority outside the already-agreed scope.
 
 Research note: current official HTML documentation and installed version-specific documentation were used together. Direct Markdown downloads from several OpenClaw documentation URLs returned HTTP 403, so those downloads were not treated as evidence; official browser-retrieved pages and the installed bundled docs supplied the relevant facts. No search batch failed, no secrets were printed, and no Cloud task was submitted for this planning review.
+
+
+## 16. Implementation evidence and adjustments (2026-10-08)
+
+- Feature branch: `codex-coordinator`, initially clean. No engineering subagents created. Two disposable Notes worktree branches were used for authorized live coding diagnostics; no commit, push or PR was created.
+- Selected compatible pair: OpenClaw / `@openclaw/codex` 2026.9.9; managed app-server 0.160.0. Published plugin peer/API floor requires this host. Release notes explicitly add the requested GPT-6.1 Sol catalog.
+- Versioned local/Cloud CLI 0.160.0 installed independently under `~/.openclaw/tools/`; personal CLI/desktop binary and config unchanged. Exact guarded app-server metadata probe confirms ChatGPT account, requested model, High support, official provider and Standard `service_tier=default` without inference.
+- Implemented registry/loader/checker/exporter, preview/validate/apply/explicit service modes, guarded isolated local coding, private Cloud SQLite claims/observations/reconciliation, on-demand procedure, routing templates and operator docs.
+- Offline tests: 27 policy/worktree/Cloud/deployment/receipt/UI override tests, 8 existing environment tests, 57 existing map wrapper tests, 2 map control tests and 20 map supervisor/notification/process tests pass (114 total). Process tests use disposable children and mocked notification/provider boundaries. They do not execute production imports. Shell syntax, Python compilation, config validation and whitespace checks pass. Deployment conflict preview passes; private state preserved.
+- CLI source corrections: prompt stdin is supported; healthy pending `cloud status` exits 1. Adapter handles both. List JSON preserves unknown statuses and cursor bounds; recent-list absence is not failure.
+- Cloud remains disabled: list read access succeeds with zero recent tasks. No reviewed environment mapping, supported remote model selector or CLI-to-current-UI pilot evidence exists. A service-controlled model policy decision is required before a pilot can claim requested remote model enforcement. No Cloud task submitted.
+- Before local cutover: Gateway running at PID 88682, no running OpenClaw tasks; map control quiescent with zero registered workers; 14 retained supervisor journals all finished, no live PID hints. This is process evidence, not backlog completion.
+- Local cutover: supported OpenClaw upgrade to 2026.9.9; pinned official plugin installed; supported auth-only migration imported the existing ChatGPT CLI account into main's auth profiles. Applied a scoped model/runtime patch, deployed templates, and intentionally restarted the Gateway. Full verified backup is outside source state at `~/Library/Application Support/OpenClaw Backups/codex-coordinator/`; scoped config/template backup is private under `~/.openclaw/backups/codex-coordinator/20261008T235357097041Z/`. Fireworks key remains private for the independent map pipeline; coordinator Fireworks plugin and fallback are disabled. Loopback, device access, private state and four-hour scheduling are preserved.
+- Consequential override correction: discovered 258 saved explicit Fireworks pins across 280 existing sessions. Cleared only legacy Fireworks session model/runtime/thinking/Fast pins through supported `sessions.patchMany`, in guarded batches of at most 100 with expected session IDs. All 258 succeeded; histories preserved. The model checker now audits saved pins, strict model allowlist, disabled implicit utility inference, plugin controls and both effective heartbeat prompts.
+- Live coordinator smoke/resume: exact native harness `codex`, provider OpenAI, effective GPT-6.1 Sol, credential source profile, High request shaping, no fallback. Runtime cwd is `runtime/coordinator/`; Gateway execution/process tools are exposed. Direct small-code fixture fix and independent guarded local coding both passed, using separate reviewed Notes worktrees. Root independently reran three assertions for each and preserved fixture evidence, then removed only the two diagnostic worktrees/branches; primary Notes checkout stayed clean and ahead one existing commit.
+- Map callback proof: harmless preflight in visible owner `agent:main:dashboard:edfa98b3-04e4-424e-96f1-54b3485af303` ended its launch turn, then automatically resumed on its exact targeted internal event without a human message. Alternate receipt passed the wrapper check. A fresh isolated visible child `agent:main:dashboard:f4fa3f43-dc17-4d33-8cc0-018cc92c344c` independently discovered 14 durable finished journals and DB quiescence despite having no earlier process handles; its own preflight/callback/alternate receipt also passed. Current witnessed Gateway lifetime: PID 20912, started `2026-10-08T23:54:44+00:00`. Private history/result/fixture evidence: `runtime/coordinator/logs/codex-cutover/`; proofs/discovery: `runtime/coordinator/state/codex-cutover/`. No production receipt, import queue or ingestion action changed.
+- Launcher receipt correction: live diagnostic parent wrote a partial receipt while claiming the correct child/run identity in prose. Added `heartbeat-receipt.py` with mandatory visible child and UUID validation, idempotent exact-identity records and private permissions; prompt uses it before ending. Recovered the diagnostic identity from supported history, preserving the original history evidence. Main/default UI configuration now receives the same heartbeat prompt so a main override cannot hide future updates.
+- Limits of local acceptance: fresh heartbeat-style child inheritance and automatic preflight callbacks are witnessed. A full production import, stop of a real import, restart during a live worker, sleep/wake with a live worker, and routine scheduled backlog pass were not run. Existing supervisor/control unit tests cover graceful/forced stop and process discovery; they do not establish those unrun operational cases. Future Gateway lifetimes need fresh owner-specific callback proof before paid import admission.
+- Cloud decision: exact CLI/account read access succeeds; selected CLI exposes no remote model/effort/speed selector. Requested strict remote policy remains unverified, mappings disabled, no environment changes and no Cloud task/pilot. Asked Paul whether to accept service-selected Cloud models or keep dispatch disabled until enforceable. Dependent work pauses for that answer. If accepted, record the explicit policy and implement a controlled first-pilot path before routine enabling; pilot must still prove environment/account/UI identity, actual base, direct user follow-up and result/PR reconciliation. Do not claim the Cloud phase complete.
+
+## 17. Desktop delegation replaces the proposed Cloud destination (2026-10-10)
+
+Paul now prefers new local Codex desktop project chats for complex coding, with
+direct sidebar visibility and human follow-up/control. Cloud environment setup
+and a headless CLI run do not meet that goal. The outstanding Cloud model decision
+in section 16 is superseded for this preferred route; Cloud mappings stay disabled.
+
+See [CODEX-DESKTOP.md](CODEX-DESKTOP.md) for the dated investigation and proposed
+implementation. Native desktop task tools exist in this engineering conversation,
+but the bundled tools bridge requires a desktop caller context. External access
+from the isolated OpenClaw coordinator has not been established. Supported deep
+links only prepare the composer. The existing shared daemon can read this chat's
+stored history but reports it not loaded while the desktop server is active;
+this is not proof of live native task visibility/control.
+
+The proposed next step is a desktop dispatcher pilot, conditional on Paul's
+choice and proof that scheduled desktop runs have native task tools. Alternatives
+are moving coordination into the desktop, or a human-submitted draft. Do not
+claim unattended creation, add polling automations or switch the coding route
+before that decision and pilot. The new plan includes transactional dispatch
+claims, ambiguous-result recovery, native worktree/base checks, independent model
+controls, later-pass discovery and direct human continuation. Map supervisor and
+completion ownership remain separate from the coding destination.
+
+This research update does not change executable model policy or coordinator
+templates, restart OpenClaw, create desktop/Cloud tasks or alter private runtime
+state. Existing migration implementation and its evidence remain intact.

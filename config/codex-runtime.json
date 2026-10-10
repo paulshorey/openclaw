@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "openclaw_binary": "/opt/homebrew/bin/openclaw",
+  "openclaw_version": "2026.9.9",
+  "plugin_package": "@openclaw/codex@2026.9.9",
+  "managed_app_server_version": "0.160.0",
+  "coordinator_home_scope": "agent",
+  "coordinator_auth_profile": "openai:account-a59cccc9-7b21-4514-b4d2-7104e585e373",
+  "cli_binary": "/Users/pshorey/.openclaw/tools/codex-cli-0.160.0/node_modules/.bin/codex",
+  "cli_version": "0.160.0",
+  "cli_home": "/Users/pshorey/.codex",
+  "user_home": "/Users/pshorey",
+  "workspace": "/Users/pshorey/git/openclaw/runtime/coordinator",
+  "compatibility_checked_at": "2026-10-08"
+}

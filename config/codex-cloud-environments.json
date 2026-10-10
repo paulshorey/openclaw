@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "repositories": {
+    "paulshorey/livx": {
+      "enabled": false, "environment_id": null, "generation": "unverified",
+      "base_branch": "main", "readiness": "unverified", "verified_at": null,
+      "tested_cli_version": null, "model_control": "unverified_remote_setting",
+      "setup_reference": null, "pilot_evidence": null
+    },
+    "paulshorey/map": {
+      "enabled": false, "environment_id": null, "generation": "unverified",
+      "base_branch": "main", "readiness": "unverified", "verified_at": null,
+      "tested_cli_version": null, "model_control": "unverified_remote_setting",
+      "setup_reference": null, "pilot_evidence": null
+    },
+    "paulshorey/notes": {
+      "enabled": false, "environment_id": null, "generation": "unverified",
+      "base_branch": "main", "readiness": "unverified", "verified_at": null,
+      "tested_cli_version": null, "model_control": "unverified_remote_setting",
+      "setup_reference": null, "pilot_evidence": null
+    }
+  }
+}

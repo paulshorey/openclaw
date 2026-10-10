@@ -1,16 +1,18 @@
 # OpenClaw development coordinator
 
-Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Flash. Coding/computer use: Codex CLI, `gpt-6-sol`, high reasoning. Manages the repositories listed in `config/managed-repositories.tsv`; considers `map` ingestion when development is quiet.
+Local OpenClaw bot (macOS LaunchAgent). Coordinator: official Codex app-server with ChatGPT subscription authentication. Coordinator and local coding start with GPT-6.1 Sol, High reasoning, Standard speed, independently configured in `config/agent-models.json`. Cloud submission is gated pending its environment and remote model policy pilot. Manages the repositories listed in `config/managed-repositories.tsv`; considers `map` ingestion when development is quiet.
+
+The preferred future destination for complex coding is a visible local Codex desktop project chat. [Desktop delegation feasibility and proposed implementation](docs/CODEX-DESKTOP.md) records the verified interfaces, the external OpenClaw access boundary and the required dispatcher pilot. Unattended desktop dispatch is not enabled; Cloud remains disabled while this replacement is evaluated.
 
 ## Installed
 
 - OpenClaw CLI: `/opt/homebrew/bin/openclaw` (npm, Homebrew Node 26)
 - Gateway state + credentials: `~/.openclaw/`
 - Agent workspace: `runtime/coordinator/` (ignored; also default exec dir, agent `cwd` unset)
-- Provider plugin: `@openclaw/fireworks-provider`
-- Model: `fireworks/accounts/fireworks/models/deepseek-v4p1-flash`
+- Runtime plugin: `@openclaw/codex@2026.9.9` with managed Codex 0.160.0
+- Desired model/runtime and billing policy: `config/agent-models.json`; live evidence: `docs/MODEL-POLICY.md`
 - `gh`: logged in as `paulshorey`
-- Codex: `~/.codex/packages/standalone/current/codex` (ChatGPT login)
+- Local/Cloud CLI: explicit versioned 0.160.0 binary and user auth home in `config/codex-runtime.json`; coordinator uses its isolated agent home and imported OpenClaw subscription profile
 - Memory search: keyword only (`memory.search.provider: none`; host OpenAI key invalid for embeddings)
 - No sandbox: Gateway can reach all of `~/git` with user permissions.
 
@@ -27,12 +29,14 @@ Local OpenClaw bot (macOS LaunchAgent). Coordinator: Fireworks DeepSeek V4.1 Fla
 | `AGENTS.md`                                  | Rules for agents engineering **this repo**                                                   |
 | `config/managed-repositories.tsv`            | GitHub/local checkout inventory for the standing coordination queue                          |
 | `scripts/deploy-workspace.py`                | Templates → workspace; keeps state; refuses to overwrite changed runtime copies              |
-| `scripts/configure.sh`                       | Applies model/workspace/heartbeat/Gateway settings, installs LaunchAgent (may start Gateway) |
-| `scripts/delegate-codex.sh`                  | Runs Codex Sol in a repo with project env; logs to `logs/`                                   |
+| `scripts/configure.sh`                       | Explicit preview/prepare/apply/service modes; default previews without live writes |
+| `scripts/delegate-codex.sh`                  | Verified isolated worktree → independent coding role; private launch/result records                                   |
 | `scripts/project-env.py`, `requirements.txt` | Project-scoped env runner + its dependency                                                   |
 | `scripts/run-map-import.sh`, `scripts/run-map-import.py` | Native import wrapper, completion/ownership checks and optional explicit limits               |
 | `scripts/status.sh`                          | Read-only Gateway/auth/PR/ingestion snapshot                                                 |
 | `scripts/configure-ui-workflow.py`           | Applies dashboard heartbeat routing, disables Telegram, removes its active bot token         |
+
+Additional tracked configuration: `config/agent-models.json`, `config/codex-runtime.json`, and `config/codex-cloud-environments.json`. Shared policy/launch code: `scripts/agent_policy.py`, `agent-policy.py`, `configure-agent-runtime.py`, `local-codex.py`, `cloud_tasks.py`, and `codex-cloud.py`. `codex-capabilities.py --role coordinator|local_coding` checks account/model metadata without inference. `coordinator-sessions.py` previews legacy Fireworks pins and uses supported session RPCs when explicitly applied. `heartbeat-receipt.py` validates and saves accepted child/run identities before the scheduled launcher ends. These helpers require Python 3.11 or newer. The on-demand `CODEX-CLOUD.md.template` deploys with the other coordinator procedures. Private Cloud state is `runtime/coordinator/state/codex-tasks.sqlite3`; private local launch records are `runtime/coordinator/logs/local-codex/UUID/run.json`.
 
 ## OpenClaw Coordinator Files
 
@@ -64,14 +68,14 @@ Paul authorized continuous uncapped ingestion of all intended map captures on 20
 `./scripts/run-map-import.sh --check` checks completion configuration and returns the current Gateway PID/start time without starting ingestion. Use the owner's effective heartbeat `isolatedSession=false` and `target="owner"` for same-conversation delivery with internal dashboard projection. Isolated routing sends exec completion to a separate heartbeat session and loses the original conversation/process scope; `target="none"` removes raw completion details from the generated prompt and disables that dashboard projection. The wrapper rejects both failure settings. This configuration-only check explicitly does not prove wake-up.
 
 The installed Gateway can defer ordinary native exec events until the next four-hour heartbeat. A callback formatted as `Exec completed (...)` can also lose its details after a heartbeat resets delivery to `none`. Spawned heartbeat sessions intentionally cannot send CLI chat messages. The runner therefore uses the supported targeted `openclaw system event --session-key <owner> --mode now --json` completion path with a generic payload beginning `INTERNAL_MAP_TERMINAL_EVENT`. It identifies the local wrapper and carries the stable event ID plus private evidence paths. The heartbeat prompt handles this marker in its owning conversation before considering scheduled launch logic. Waiting and health checks remain ordinary code; only terminal decisions start model turns. Never clear the subagent execution flag to bypass CLI restrictions.
-Before unattended imports, run `./scripts/run-map-import.sh --preflight --owner-session <actual-dashboard-session-key>` through native `exec` with `background=true`, `timeoutSeconds=0`, then end the turn. This mode accepts no import arguments, deadline, credentials or existing completion receipt. It waits a fixed 12 seconds in ordinary code, writes private preflight terminal evidence with a unique marker, and attempts one targeted internal system-event callback. Verify the **automatic continuation with that exact marker in the same dashboard conversation after the initiating turn ends**. A CLI acknowledgement proves acceptance only; it does not prove that a model turn ran. Hidden `agent:main:subagent:...` owners are rejected. Repeat actual proof after a Gateway restart or notification/configuration change.
+Before unattended imports, run `./scripts/run-map-import.sh --preflight --owner-session <actual-dashboard-session-key>` through `gateway_exec` with `background=true`, `timeoutSeconds=0`, then end the turn. This mode accepts no import arguments, deadline, credentials or existing completion receipt. It waits a fixed 12 seconds in ordinary code, writes private preflight terminal evidence with a unique marker, and attempts one targeted internal system-event callback. Verify the **automatic continuation with that exact marker in the same dashboard conversation after the initiating turn ends**. A CLI acknowledgement proves acceptance only; it does not prove that a model turn ran. Hidden `agent:main:subagent:...` owners are rejected. Repeat actual proof after a Gateway restart or notification/configuration change.
 
 Each terminal callback must preserve its generic marker through the Gateway's prompt construction even when the conversation's delivery route is `none`. Test automatic preflight-to-import-to-terminal continuation without an intervening human message; one successful wake after a manual chat is insufficient. Native exec ownership and same-owner verification still apply. The wrapper does not start an external channel, independent server or detached import.
 A heartbeat with eligible map work must establish its own missing preflight rather than defer it. It saves the chosen action and standing continuous authorization in private `state/map-import-action.json`, launches preflight and ends the turn; the automatic preflight callback records witnessed proof and launches that action. Resume The Dyrt's original campground run `4dda8606-9c20-4275-bae6-c14cdea9e38c` first with `--unlimited`, after fresh control and compatibility checks. After whole-file verification, the same proven owner continuously advances the next eligible intended capture. Fresh four-hour conversations reconcile active ownership before selecting work; unchanged deferred PRs do not prevent ingestion progress. A quiet summary is appropriate only when no independently authorized action remains.
 
 Record `runtime/coordinator/state/map-native-completion.json` only after witnessing that targeted callback. It uses `schema_version: 1`, `notification_kind: "internal_system_event"`, the exact `owner_session`, `gateway` object from `--check` (`pid` and timezone-aware `started_at`), timezone-aware `completed_at` and later `checked_at`, the actual native exec `native_process_id`, the preflight marker as `completion_event_id`, `completion_status: "succeeded"`, and an absolute `evidence_path` to a nonempty private transcript/note in `runtime/coordinator/` documenting the observed continuation. The preflight never creates this proof automatically. Do not fabricate a receipt, use acceptance as delivery proof, or borrow another conversation's evidence. Check it with `./scripts/run-map-import.sh --check --owner-session <actual-dashboard-session-key>`. The wrapper rejects legacy native-exit-only, structured exec-event and rejected chat-transport proof, missing evidence, another owner, stale PID/start time, hidden sessions and invalid timestamps. A current private alternate receipt can be passed with `--completion-receipt /absolute/private/path`.
 
-Launch through OpenClaw native `exec` with `background=true` and `timeoutSeconds=0`. Pass `--owner-session <actual-dashboard-session-key> --`, then the exact compatible managed run arguments and `--unlimited`. Omit `--max-hours` and finite provider caps for the standing backlog. The wrapper injects `--unlimited` when provider caps are absent; on resume it clears saved `maxLlmRequests`, `maxCostUsd` and `geocodeLimit` while retaining the original cohort, stages and completed checkpoints. The supervisor's full-run timeout defaults to no deadline. Optional `--max-hours` and finite provider limits are for later explicit requests, and finite caps cannot be combined with `--unlimited`. The wrapper refuses ordinary terminals, uses shell-only project credentials, and requires `DB_MAP_URL`. It requires `FIREWORKS_API_KEY` except for an explicit **new** file/category run with exactly one `--from report` or `--from verify`, all three budgets zero, and no resume, conflicting stage options or consolidation. A resume preserves its original stage scope and cannot be converted into a report suffix by adding `--from`. Keep scope/authorization/telemetry/handles/event IDs in private `state/map-imports.md`; PostgreSQL remains progress truth. Waiting never invokes a Codex model.
+Launch through OpenClaw `gateway_exec` with `background=true` and `timeoutSeconds=0`. Pass `--owner-session <actual-dashboard-session-key> --`, then the exact compatible managed run arguments and `--unlimited`. Omit `--max-hours` and finite provider caps for the standing backlog. The wrapper injects `--unlimited` when provider caps are absent; on resume it clears saved `maxLlmRequests`, `maxCostUsd` and `geocodeLimit` while retaining the original cohort, stages and completed checkpoints. The supervisor's full-run timeout defaults to no deadline. Optional `--max-hours` and finite provider limits are for later explicit requests, and finite caps cannot be combined with `--unlimited`. The wrapper refuses ordinary terminals, uses shell-only project credentials, and requires `DB_MAP_URL`. It requires `FIREWORKS_API_KEY` except for an explicit **new** file/category run with exactly one `--from report` or `--from verify`, all three budgets zero, and no resume, conflicting stage options or consolidation. A resume preserves its original stage scope and cannot be converted into a report suffix by adding `--from`. Keep scope/authorization/telemetry/handles/event IDs in private `state/map-imports.md`; PostgreSQL remains progress truth. Waiting never invokes a Codex model.
 
 For the first full continuation, after this owner has witnessed its preflight and control is quiescent:
 
@@ -83,7 +87,7 @@ For the first full continuation, after this owner has witnessed its preflight an
 
 Zero budgets alone do not make an arbitrary file or resume provider-free: request/cost limits bound normalization, and `--geocode-limit` bounds geocoder work; embedding, matching and fusion are not hard-capped by those flags. All normal provider stages are already authorized for full ingestion. A new `source.json --category campground --from report --max-llm-requests 0 --max-cost-usd 0 --geocode-limit 0` is a provider-free suffix, but can still perform deterministic extraction and database writes. Use such a suffix only for a compatible verification action; it does not replace the full import or prove whole-file completion. Require the file's `coverage="complete"` from `ingest:inventory --json` and `action="complete"` from `ingest:queue --json`; raw `ingestion_files.status="complete"` means extraction completed.
 
-Failures still need diagnosis and checkpoint-preserving recovery. Delegate code/script, source-mapping and provider-control repairs to the connected Codex CLI with the exact run/execution/stage IDs and logs. Engineers validate with bounded smoke tests; the cheap OpenClaw runner owns full continuations and backlog advancement. Preserve maintenance ownership and verify quiescence before runtime/schema/source repairs. Do not repeatedly resume against an unresolved outage, resend ambiguous callbacks, or use new sample runs to replace an interrupted full run. Unknown cost telemetry does not block an otherwise healthy authorized run.
+Failures still need diagnosis and checkpoint-preserving recovery. Delegate code/script, source-mapping and provider-control repairs to the connected Codex CLI with the exact run/execution/stage IDs and logs. Engineers validate with bounded smoke tests; the local Gateway runner owns full continuations and backlog advancement. Preserve maintenance ownership and verify quiescence before runtime/schema/source repairs. Do not repeatedly resume against an unresolved outage, resend ambiguous callbacks, or use new sample runs to replace an interrupted full run. Unknown cost telemetry does not block an otherwise healthy authorized run.
 
 The wrapper owns one foreground `project-env.py → ingest:supervise watch` child, forwards its launch/terminal stdout, and retains bounded receipt capture plus raw stdout/stderr privately under `runtime/coordinator/logs/map-import-runner/`. Before a normal terminal callback, it verifies the canonical map `.ingest-jobs/<uuid>/job.json` and `result.json`, exact scope, event/job/run/execution identities, and terminal outcome. The callback uses the exact `ingestion:<job-uuid>:terminal` ID; deduplicate a later delayed native event against it. Pre-job failures and invalid journals send a distinct `map-import-wrapper:<uuid>:terminal` blocker with private wrapper evidence, without inventing a map run/job or advancing the queue. Callback claims and `callback.json` preserve the stable event ID, actual `{ok:true}` enqueue acknowledgement or failed/uncertain delivery. The wake API does not return a model run ID or provide transport idempotency; claims and event reconciliation prevent duplicate decisions. An exit-zero-only response is not acceptance. There are no automatic callback retries or import relaunches. Callback failure returns a blocker even when map succeeded; inspect owner history and evidence before any repair or queue advance.
 
@@ -128,7 +132,7 @@ openclaw config get agents.entries.main.workspace
 - `--shell-only`: do not read `.env`/`.env.local`; use injected/login-shell values and example declarations. Required for map.
 - `--require NAME`: import an undeclared shell var and refuse execution when that explicit requirement is absent/empty. `--check` reports all missing declarations but returns failure only for missing explicit requirements; optional `.env.example` names remain optional.
 - Use for anything needing project config (python, node, db, containers, dev servers, deploy CLIs). Not needed for `git`/`rg`/`gh`.
-- `delegate-codex.sh` wraps with this automatically; pass the nested app path when relevant.
+- The coding wrapper loads project env at its verified worktree root and clears inference API keys afterward. Tools needing a nested app environment must invoke project-env there explicitly.
 - `map` root uses shell-provided credentials; `.env.example` is reference only. `map/apps/map` unset: `NEXT_PUBLIC_API_URL`, `THUNDERFOREST_API_KEY` (as of 2026-09-23).
 
 ## Operate
@@ -177,7 +181,9 @@ The Gateway reloads prompt/skill configuration; runtime templates are used on su
 ## Delegate
 
 ```sh
-./scripts/delegate-codex.sh /Users/pshorey/git/example /absolute/path/to/prompt.txt
+./scripts/delegate-codex.sh --repository paulshorey/notes \
+  --worktree /absolute/linked-worktree --base REVIEWED_COMMIT_SHA \
+  --prompt /absolute/private/prompt.txt
 ```
 
 - Put prompts outside tracked files or in `runtime/coordinator/state/`.
@@ -186,20 +192,46 @@ The Gateway reloads prompt/skill configuration; runtime templates are used on su
 
 ## Work cycle
 
-- Every four hours: resume ledger work; check the managed repositories' branches, PRs, reviews, CI, and issues; delegate selected tasks to Sol; record priorities and deferrals; no duplicates.
-- Sol handles code/GitHub mutations and process repairs. The coordinator may launch the reviewed native map runner and make audited inventory metadata edits as described in its AGENTS template.
-- Quiet: reconcile interrupted full runs, then continuously advance eligible intended files from map's `ingest:queue --json` after whole-file verification. OpenClaw is the cheap runner; Node handles waiting and hourly health. Native background exec owns the process, and the verified targeted terminal callback continues the owning conversation. Delegate technical blockers to Sol, preserve checkpoints, and use `--unlimited` with no overall deadline unless Paul later requests limits. Read map's `data/ingestion-agents.md#native-openclaw-runner`.
+- Every four hours: resume ledger work; check the managed repositories' branches, PRs, reviews, CI, and issues; implement small fixes or dispatch local/validated Cloud tasks; record priorities and deferrals; no duplicates.
+- The coordinator may implement scoped fixes directly in an isolated worktree; dedicated local/Cloud tasks handle larger work. GitHub writes and process repairs follow existing authority/project rules. Map uses `gateway_exec` / `gateway_process`, durable supervisor journals and DB control for later conversations.
+- Quiet: reconcile interrupted full runs, then continuously advance eligible intended files from map's `ingest:queue --json` after whole-file verification. OpenClaw launches the model-free runner; Node handles waiting and hourly health. Native background exec owns the process, and the verified targeted terminal callback continues the owning conversation. Delegate technical blockers to Sol, preserve checkpoints, and use `--unlimited` with no overall deadline unless Paul later requests limits. Read map's `data/ingestion-agents.md#native-openclaw-runner`.
 
-## New Mac setup
+## Configuration and migration
 
-1. Node 26 + OpenClaw ([install](https://docs.openclaw.ai/install)); install `@openclaw/fireworks-provider`.
-2. `FIREWORKS_API_KEY=...` in `~/.openclaw/.env`, `chmod 600`.
-3. `./scripts/configure.sh` (deploys, applies settings, installs LaunchAgent), or manually: deploy, set both workspace keys to `runtime/coordinator/`, set model + heartbeat, `openclaw config validate`.
-4. Auth `gh` as `paulshorey`; auth `codex` via ChatGPT; confirm `gpt-6-sol` access.
-5. `openclaw gateway install`, `status`, `health`, one manual agent check.
+`./scripts/configure.sh` defaults to a read-only patch preview. `--validate` checks the patch against OpenClaw; `--apply` backs up needed private config/templates, applies the scoped patch and deploys without starting/installing the service. `--prepare` explicitly installs the selected host/plugin/CLI dependencies. `--install-service`, `--start` and `--restart` are deliberate service operations. Reconcile active map/local/Cloud work before upgrades or restarts; do not interrupt imports to change a model.
+
+For a new Mac, update the non-secret absolute paths in `config/codex-runtime.json` and inventory, install supported Homebrew Node/Python, prepare dependencies, authenticate the explicit CLI using ChatGPT and `gh` as the intended account. Import only subscription auth through supported migration:
+
+```sh
+./scripts/configure.sh --dry-run
+./scripts/configure.sh --prepare
+openclaw migrate plan codex --from /absolute/user/codex-home --agent main --include-secrets --item auth:openai
+openclaw migrate apply codex --from /absolute/user/codex-home --agent main --include-secrets --item auth:openai --yes
+openclaw models auth list --agent main --provider openai --json
+./scripts/configure.sh --validate
+./scripts/configure.sh --apply --auth-profile ACTUAL_OPENAI_SUBSCRIPTION_PROFILE
+./scripts/configure.sh --install-service
+./scripts/configure.sh --start
+.venv/bin/python scripts/agent-policy.py --check
+```
+
+Preserve Fireworks credentials at 0600 for the independent map pipeline and deliberate rollback. Coordinator/local coding inference uses ChatGPT allowance with no API fallback; allowance is shared with ChatGPT/Codex. Inference runs on OpenAI servers. Subscription exhaustion or expired sign-in is a blocker, not a provider switch.
+
+Use [model policy/override inventory](docs/MODEL-POLICY.md) for role changes and [Cloud operations](docs/CODEX-CLOUD.md) for capabilities, environment setup and recovery. Cloud mappings start disabled; local CLI model flags do not select the remote Cloud model. Durable state survives a new heartbeat; in-memory Gateway process handles may be scoped to another conversation or lost on restart. Inspect map `ingest:supervise list` and `ingest:control list --json` through shell-only project-env before relaunching or controlling work.
+
+Portable, provider-free checks:
+
+```sh
+.venv/bin/python scripts/test-codex-coordinator.py
+.venv/bin/python scripts/test-project-env.py
+.venv/bin/python scripts/test-run-map-import.py
+.venv/bin/python scripts/deploy-workspace.py --check
+bash -n scripts/configure.sh scripts/delegate-codex.sh scripts/run-map-import.sh
+git diff --check
+```
 
 ## References
 
 - OpenClaw: [install](https://docs.openclaw.ai/install), [macOS Gateway](https://docs.openclaw.ai/platforms/mac/bundled-gateway), [workspace](https://docs.openclaw.ai/agent-workspace), [heartbeat](https://docs.openclaw.ai/heartbeat), [Fireworks provider](https://docs.openclaw.ai/providers/fireworks)
 - Dashboard workflow: [session tools](https://docs.openclaw.ai/concepts/session-tool), [sessions and sidebar](https://docs.openclaw.ai/web/control-ui/sessions-and-sidebar), [notifications](https://docs.openclaw.ai/web/notifications)
-- [DeepSeek V4.1 Flash](https://fireworks.ai/models/deepseek-ai/deepseek-v4p1-flash), [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol)
+- [DeepSeek V4.1 Flash](https://fireworks.ai/models/deepseek-ai/deepseek-v4p1-flash), [Codex models](https://learn.chatgpt.com/docs/models?surface=cli), [authentication](https://learn.chatgpt.com/docs/auth), [Cloud](https://learn.chatgpt.com/docs/cloud)

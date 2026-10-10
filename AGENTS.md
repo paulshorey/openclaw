@@ -4,12 +4,12 @@ This repository develops and configures the local OpenClaw coordinator. This roo
 
 ## Layout and workflow
 
-- `config/coordinator/*.template`: source for OpenClaw's injected `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, plus the on-demand `MAP-IMPORTS.md` procedure.
+- `config/coordinator/*.template`: source for OpenClaw's injected `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, plus on-demand `MAP-IMPORTS.md` and `CODEX-CLOUD.md` procedures.
 - `config/heartbeat-prompt.txt`: scheduled coordinator prompt.
 - `config/managed-repositories.tsv`: reviewed GitHub/local checkout inventory; add future managed repositories here.
 - `runtime/coordinator/`: active OpenClaw workspace, with deployed instructions and private `state/`, `logs/`, and memory. Do not commit or wipe it.
 - `scripts/deploy-workspace.py`: deploy templates while preserving runtime data; refuses to overwrite a changed managed file.
-- `scripts/configure.sh`: applies settings and installs the LaunchAgent; it may start the Gateway.
+- `scripts/configure.sh`: explicit preview/prepare/apply/service modes. Default is read-only preview; apply does not start/install the service. Model roles live in `config/agent-models.json`; maintain `docs/MODEL-POLICY.md` when changing role consumers or overrides.
 
 Edit the templates for coordinator behavior, deploy them, and validate OpenClaw config. Inspect the diff and run checks relevant to software changes. Preserve the Fireworks key in `~/.openclaw/.env` with mode `0600`; never put credentials in Git, prompts, or tool output. Keep the Gateway on loopback.
 
@@ -25,3 +25,5 @@ For commands needing credentials from another project, use `.venv/bin/python scr
 ```
 
 Do not start OpenClaw for a documentation or template edit unless requested. The operator may intentionally leave it stopped.
+
+The native Codex runtime discovers parent AGENTS files. The nested coordinator workspace owns operating instructions; this root describes engineering this setup and must not redefine the coordinator role. Keep model IDs out of executable prompts. Cloud capabilities and release gates are in `docs/CODEX-CLOUD.md`; preserve disabled mappings until verified.
