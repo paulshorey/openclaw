@@ -1,29 +1,66 @@
 # Engineering instructions for Codex
 
-This repository develops and configures the local OpenClaw coordinator. This root `AGENTS.md` guides engineering agents. OpenClaw's operating instructions are versioned in `config/coordinator/` and deployed to the ignored `runtime/coordinator/` workspace.
+This repository develops native Codex desktop project coordinators. Read README.md
+for the file map and docs/OPERATIONS.md for recovery. The root file guides engineers
+working on this tooling; scheduled operating procedures live in config/coordinators.
 
-## Layout and workflow
+## Working judgment
 
-- `config/coordinator/*.template`: source for OpenClaw's injected `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, plus on-demand `MAP-IMPORTS.md` and `CODEX-CLOUD.md` procedures.
-- `config/heartbeat-prompt.txt`: scheduled coordinator prompt.
-- `config/managed-repositories.tsv`: reviewed GitHub/local checkout inventory; add future managed repositories here.
-- `runtime/coordinator/`: active OpenClaw workspace, with deployed instructions and private `state/`, `logs/`, and memory. Do not commit or wipe it.
-- `scripts/deploy-workspace.py`: deploy templates while preserving runtime data; refuses to overwrite a changed managed file.
-- `scripts/configure.sh`: explicit preview/prepare/apply/service modes. Default is read-only preview; apply does not start/install the service. Model roles live in `config/agent-models.json`; maintain `docs/MODEL-POLICY.md` when changing role consumers or overrides.
+Check consequential assumptions against the environment, project guides and current
+authoritative documentation. Explain discrepancies. Correct obvious reversible
+mistakes and proceed; ask Paul when plausible interpretations materially change
+scope, cost or product behavior. Continue independent useful work while waiting.
 
-Edit the templates for coordinator behavior, deploy them, and validate OpenClaw config. Inspect the diff and run checks relevant to software changes. Preserve the Fireworks key in `~/.openclaw/.env` with mode `0600`; never put credentials in Git, prompts, or tool output. Keep the Gateway on loopback.
+## Layout and changes
 
-Read `README.md` for the setup and file map. Keep operating rules in the coordinator templates, engineering rules here, project rules in each target repository's `AGENTS.md`, and run state in the ignored workspace. Update the README when the layout or operator procedure changes. The coordinator and `scripts/status.sh` read the managed-repository inventory from this checkout; review a repository's remote and instructions before adding it. Do not copy the README into an agent prompt.
+- config/projects.json owns reviewed repositories, primary checkout paths, schedules
+  and responsibility files. Review origin and project instructions before adding one.
+- config/agent-models.json independently owns coordinator and coding model intent.
+  Update docs/MODEL-POLICY.md whenever consumers or overrides change. Keep model IDs
+  out of executable prompts.
+- config/coordinators/common.md and project files own operating procedures. Generated
+  schedule prompts point to these files; procedure edits need no prompt deployment.
+- runtime/native/PROJECT contains private continuity, SQLite task/pass ledgers,
+  frozen coding prompts and diagnostic receipts. Never commit, wipe or bulk import it.
+  Preserve earlier ignored runtime/history and credentials as recovery evidence.
+- scripts/coordinator.py prepares native tool arguments and durable state. It does
+  not launch an agent. Use supported native app tools for schedules and tasks;
+  never edit automation TOMLs or desktop databases, spoof thread context or bridge
+  private desktop endpoints from external processes.
 
-The configured OpenClaw workspace is `runtime/coordinator/`. Leave agent `cwd` unset so its default execution directory is that workspace. OpenClaw loads bootstrap files there. Codex may read this root file while engineering the repository; OpenClaw's own `AGENTS.md` comes from its nested workspace. Do not assume OpenClaw discovers parent instructions.
+Use one bounded local scheduled pass per project. Scheduled source changes belong
+in separate visible native worktree tasks. Preserve primary checkout changes and
+human ownership. Never reclaim a pass or redispatch work based on age alone.
+Unknown/pending dispatch is reconciled using actual native IDs, never retried blindly.
+No headless agent, remote coding environment or external inference fallback.
 
-For commands needing credentials from another project, use `.venv/bin/python scripts/project-env.py --cwd <project-or-app-path> -- <command>`. Choose the actual project or nested app path. `--shell-only` skips dotenv loading and is required for map. `--check` reports names and availability without values; `--require NAME` adds a required shell variable absent from dotenv files. Ordinary `git`, `rg`, and `gh` inspection does not need the runner. Respect the target repository's instructions. Examples:
+Native scheduled context discovers the project's own parent/nested AGENTS files.
+Read them and preserve their maintenance, credentials, testing and PR requirements.
+Do not redefine target project engineering rules in this root file. Model-free
+scripts own long-running processes; ordinary scheduled passes reconcile them.
+
+For commands needing project credentials, use:
 
 ```sh
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only -- pnpm --filter @lib/db-map ingest:status
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/livx -- pnpm --filter apps/client-app dev
+.venv/bin/python scripts/project-env.py --cwd ACTUAL_PROJECT_OR_APP -- COMMAND
 ```
 
-Do not start OpenClaw for a documentation or template edit unless requested. The operator may intentionally leave it stopped.
+Map always requires --shell-only; do not load its dotenv files. --check prints
+names and availability without values; --require NAME adds a required shell value.
+Ordinary git/rg/gh reads need no runner. Never put secrets in Git, prompts or output.
+Independent map provider keys remain necessary even though coordination uses the
+Codex desktop account. Do not modify a running ingestion implementation; observe
+maintenance and actual database/process quiescence before such changes.
 
-The native Codex runtime discovers parent AGENTS files. The nested coordinator workspace owns operating instructions; this root describes engineering this setup and must not redefine the coordinator role. Keep model IDs out of executable prompts. Cloud capabilities and release gates are in `docs/CODEX-CLOUD.md`; preserve disabled mappings until verified.
+Inspect the diff and run meaningful checks relevant to changes. Current validation:
+
+```sh
+.venv/bin/python scripts/test-native-coordinator.py
+.venv/bin/python scripts/test-project-env.py
+./scripts/status.sh
+```
+
+Use the app's automation_update for any schedule mutation, preserve unrelated
+schedules and notification preferences, and audit the saved fields afterward.
+Do not start services or imports for a documentation change. Record release evidence
+and unknowns honestly; an intended account/speed policy is not proof of runtime use.

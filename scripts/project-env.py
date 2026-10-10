@@ -18,12 +18,12 @@ from dotenv import dotenv_values
 
 
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-MARKER = b"\0__OPENCLAW_LOGIN_ENV__\0"
+MARKER = b"\0__COORDINATOR_LOGIN_ENV__\0"
 
 
 def login_environment() -> dict[str, str]:
     probe = subprocess.run(
-        ["/bin/zsh", "-lc", 'printf "\\0__OPENCLAW_LOGIN_ENV__\\0"; /usr/bin/env -0'],
+        ["/bin/zsh", "-lc", 'printf "\\0__COORDINATOR_LOGIN_ENV__\\0"; /usr/bin/env -0'],
         capture_output=True,
         timeout=20,
         check=True,

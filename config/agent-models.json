@@ -1,21 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "roles": {
     "coordinator": {
-      "provider": "openai", "runtime": "codex", "model": "gpt-6.1-sol",
+      "runtime": "codex_desktop", "model": "gpt-6.1-sol",
       "reasoning_effort": "high", "speed": "standard",
       "authentication": "chatgpt", "allow_api_fallback": false
     },
-    "local_coding": {
-      "provider": "openai", "runtime": "codex_cli", "model": "gpt-6.1-sol",
+    "coding": {
+      "runtime": "codex_desktop", "model": "gpt-6.1-sol",
       "reasoning_effort": "high", "speed": "standard",
       "authentication": "chatgpt", "allow_api_fallback": false
-    },
-    "cloud_coding": {
-      "runtime": "codex_cloud", "requested_model": "gpt-6.1-sol",
-      "requested_reasoning_effort": "high", "requested_speed": "standard",
-      "model_control": "unverified_remote_setting", "authentication": "chatgpt",
-      "allow_api_fallback": false, "attempts": 1
     }
   }
 }
