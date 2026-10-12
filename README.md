@@ -18,7 +18,8 @@ not an active automation dependency.
   prompts. The global skill checks task ownership and scope rather than granting
   permission itself.
 
-Current private continuity/task ledgers live under `~/.codex/project-coordinator`.
+Current private continuity/task ledgers live in each project's ignored
+`.codex/project-coordinator` directory in its primary checkout.
 Map launch/admission evidence lives in its existing ignored
 `lib/db-map/.ingest-jobs/.coordinator` directory. The active Dyrt import was preserved;
 this migration neither stopped it nor launched paid work.
