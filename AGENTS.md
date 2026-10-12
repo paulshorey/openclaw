@@ -1,8 +1,8 @@
 # Historical coordinator repository
 
 This checkout is retired from active operation. Native project automation is owned
-by Codex saved prompts and the global skill at
-`/Users/pshorey/.agents/skills/our-new-global-skill/SKILL.md`. Map's process controls
+by Codex saved prompts. Native automation memory handoffs use the global skill at
+`/Users/pshorey/.agents/skills/automation-memory/SKILL.md`. Map's process controls
 and operating guide live in the map repository. Read README.md for their locations
 and review links.
 
