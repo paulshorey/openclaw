@@ -1,8 +1,0 @@
-{
-  "schema_version": 1,
-  "granted_by": "Paul Shorey",
-  "granted_on": "2026-10-11",
-  "source_thread": "01a1123f-868b-7390-bf51-b0ac1714d490",
-  "projects": ["map", "livx", "notes"],
-  "statement": "I authorize the map, livx, and notes scheduled coordinators to send follow-up instructions to Codex desktop coding tasks they create for their respective projects, without asking me each time. They may request status, address review feedback, correct implementation errors, and request fixes for failed checks within the task’s approved scope. Record this as standing authorization and update the coordinator instructions and scheduled prompts."
-}
