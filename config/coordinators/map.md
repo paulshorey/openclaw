@@ -42,6 +42,29 @@ resuming against an unresolved provider error. Maintenance and confirmed quiesce
 are required before ingestion runtime/schema/data changes. Use targeted supervisor
 or database control requests for stops; confirm actual worker/lock exit afterward.
 
+## Local checkout after remote Git maintenance
+
+Use `/Users/pshorey/.agents/skills/pull-request-manage/SKILL.md` for relevant PR and
+branch maintenance. Reconcile `/Users/pshorey/git/map` after remote branch pushes,
+conflict repairs, merges, or superseded-PR closures. Updating a temporary coding
+worktree or remote-tracking refs alone does not synchronize the primary checkout.
+When its feature PR is merged and no additional local work remains, fast-forward
+local `main` and return the primary checkout to it. Fast-forward an open feature
+branch's updated upstream when appropriate; preserve an unrelated active branch.
+Verify the final branch, HEAD, upstream SHA, ahead/behind state and clean/dirty status.
+
+Inspect edits, unpushed commits, Git operations, worktrees and actual process ownership
+before a switch or pull. Never reset, force checkout or automatically stash work.
+If changed files affect a live ingestion worker, follow the repository maintenance
+workflow, confirm quiescence, synchronize and validate, reopen only your own gate,
+and restore the intended run with its original cohort/checkpoints and `--unlimited`.
+Reconcile the exact prior supervisor result before launching a replacement; never
+duplicate a live worker. An identical file tree allows a branch/ref-only switch
+without stopping healthy ingestion. First fast-forward an unchecked-out local base
+when safe so switching does not briefly install old runtime files. If blocked,
+record the current and intended checkout states, evidence and exact next action in
+ACTIVE.md and the visible result; revisit the pending sync on later passes.
+
 Do not modify the running ingestion implementation during routine coordination.
 Smoke tests follow project bounds. Production imports never run in a coding task's
 worktree. Raw private logs and credentials stay out of prompts and Git.

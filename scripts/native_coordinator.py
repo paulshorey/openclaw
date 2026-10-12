@@ -195,6 +195,14 @@ def pilot(slug, action, thread_id=None, child_id=None, evidence=None):
 
 def prompt(slug):
     item = project(slug)
+    checkout_sync = (
+        "Use /Users/pshorey/.agents/skills/pull-request-manage/SKILL.md for relevant PR and branch maintenance. "
+        f"After remote pushes, conflict repairs, merges or PR closures, safely synchronize the primary checkout at {item['path']}; "
+        "return a merged local feature branch to current main when no additional work remains. "
+        "Verify the local branch, HEAD, upstream and working-tree status. "
+        "Follow map.md process/maintenance safeguards for active ingestion; record any blocked sync and its next action. "
+        if slug == "map" else ""
+    )
     return (f"You are Paul's native desktop scheduled coordinator for {slug} only. "
             f"Project: {item['path']}; reviewed repository: {item['repository']}. "
             f"Coordinator tooling checkout: {ROOT}. "
@@ -203,6 +211,7 @@ def prompt(slug):
             f"with --project {slug} for private state and duplicate guards. "
             "Perform one bounded coordination pass; reconcile existing tasks before starting work. "
             "Keep source edits in separate native worktree coding tasks. "
+            f"{checkout_sync}"
             "End with a concise visible result, pending decisions and next action.")
 
 def prepare_task(slug, scope, base, prompt_path, authority, acceptance):
