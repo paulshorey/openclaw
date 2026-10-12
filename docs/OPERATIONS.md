@@ -26,6 +26,12 @@ schedule-plan, registers its returned ID, and audits it. Never create a duplicat
 if a schedule exists. Enable using native automation_update only after acceptance.
 No app configuration or secret file is written by these Python tools.
 
+The 2026-10-11 follow-up authorization update preserved the live schedules: all
+three currently run once daily at 04:00 in the desktop's local timezone. The
+project registry still lists the initial four-hour cadence, so schedule-audit
+reports an existing rrule difference. Reconcile that timing separately with Paul;
+the authorization update changes the prompts while preserving the live settings.
+
 ## Durable project continuity
 
 runtime/native/PROJECT/ACTIVE.md holds active requests, actual native task/PR/job
@@ -64,6 +70,22 @@ native candidates by project, scope/prompt, time and actual history. Never retry
 creation merely because the app response was lost. After independent diff/check/PR
 verification, task-observe --close records the evidence. Follow-ups are limited to
 human-authorized tasks/scope; unrelated task chats remain human-owned.
+
+Paul's 2026-10-11 standing authorization permits map, livx and notes scheduled
+coordinators to send follow-up instructions to the Codex desktop coding tasks they
+create for their respective projects without asking each time. This covers status
+requests, review feedback, implementation corrections and failed-check fixes within
+the approved scope. Respect newer human instructions; scope expansion and unrelated
+targets still need explicit direction. Verify the exact thread/host and creation
+evidence in the project ledger before messaging. Record sends and reconcile ambiguous
+results against actual target history before retrying.
+
+The exact human statement, grant date, project allowlist and source conversation are
+versioned in config/follow-up-authorization.json. The prompt generator embeds that
+record for covered projects, so future standalone runs receive the permission in
+their saved prompt. Adding another managed project does not inherit this grant.
+Update existing schedules through native automation_update when the grant changes;
+preserve their current timing, model/reasoning, status, target and notification policy.
 
 ## Long-running map imports
 

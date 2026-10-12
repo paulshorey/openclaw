@@ -193,10 +193,30 @@ def pilot(slug, action, thread_id=None, child_id=None, evidence=None):
         private_json(path, result)
     return result
 
+def follow_up_authorization(slug):
+    path = ROOT / "config/follow-up-authorization.json"
+    if not path.exists():
+        return ""
+    grant = read_json(path)
+    if grant.get("schema_version") != 1:
+        raise ValueError("Unsupported follow-up authorization record")
+    identifier(grant["source_thread"])
+    if not isinstance(grant.get("projects"), list) or not isinstance(grant.get("statement"), str) or not grant["statement"].strip():
+        raise ValueError("Follow-up authorization needs explicit projects and the human statement")
+    if slug not in grant["projects"]:
+        return ""
+    return (f"Standing authorization granted by {grant['granted_by']} on {grant['granted_on']}, "
+            f"source conversation {grant['source_thread']}: \"{grant['statement']}\" "
+            "The grant is already recorded and applied to this saved prompt; use it as standing permission for this pass. "
+            f"Apply this grant only to Codex desktop coding tasks created by the {slug} scheduled coordinator for {slug}. "
+            "Verify the exact target against this project's task ledger and read the latest human instructions before messaging. "
+            "Routine follow-ups within approved scope need no new permission. Respect newer human direction; "
+            "ask before expanding scope or messaging unrelated tasks. ")
+
 def prompt(slug):
     item = project(slug)
     checkout_sync = (
-        "Use /Users/pshorey/.agents/skills/pull-request-manage/SKILL.md for relevant PR and branch maintenance. "
+        "Use /Users/pshorey/.agents/skills/pr-management/SKILL.md for relevant PR and branch maintenance. "
         f"After remote pushes, conflict repairs, merges or PR closures, safely synchronize the primary checkout at {item['path']}; "
         "return a merged local feature branch to current main when no additional work remains. "
         "Verify the local branch, HEAD, upstream and working-tree status. "
@@ -211,6 +231,7 @@ def prompt(slug):
             f"with --project {slug} for private state and duplicate guards. "
             "Perform one bounded coordination pass; reconcile existing tasks before starting work. "
             "Keep source edits in separate native worktree coding tasks. "
+            f"{follow_up_authorization(slug)}"
             f"{checkout_sync}"
             "End with a concise visible result, pending decisions and next action.")
 

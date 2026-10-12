@@ -59,12 +59,23 @@ For a new authorized implementation:
    An error/timeout after submission is ambiguous: retain the claim and inspect
    native candidates. Never retry automatically or use a CLI/Cloud
    substitute. The child verifies its actual worktree/origin/base before edits.
-5. Before sending a follow-up to a task, verify Paul's explicit authorization to
-   message it in trusted human instructions. Creation alone is not that permission.
-   If missing, save the proposed correction and request his direction in the result.
-   Reconcile the newest human messages and pending decisions first. Follow-up cannot
-   expand scope or override a human. Do not merge, publish a release or message
-   other people without the applicable project/user authority.
+5. Paul granted standing follow-up authorization on 2026-10-11 to the map, livx and
+   notes scheduled coordinators for Codex desktop coding tasks they create for their
+   respective projects. His exact statement and source conversation are recorded
+   in `config/follow-up-authorization.json` and included in each saved launch prompt.
+   Use native `send_message_to_thread` for status requests, review feedback,
+   implementation corrections and failed-check fixes within the approved task scope;
+   do not ask again for these routine follow-ups. Verify the target's actual ready
+   thread ID/host against this project's task ledger and creation evidence. A task
+   found elsewhere in the account is not automatically a coordinator-owned task.
+   Read the newest human messages, task results and pending decisions before sending
+   a precise follow-up. Respect newer human direction. Ask before expanding scope or
+   messaging unrelated tasks. If the grant does not cover this project/target, save
+   the proposed correction and request explicit human direction in the result.
+   Record the message and native receipt in private task evidence. On a lost or
+   ambiguous send result, inspect the target's actual history before retrying.
+   Do not merge, publish a release or message other people without the applicable
+   project/user authority.
 
 Keep one writer per task/worktree. Do not delete worktrees/branches with running
 tasks, uncommitted changes or unmerged work. Preserve untrusted-ref rules. On

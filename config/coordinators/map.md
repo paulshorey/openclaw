@@ -44,7 +44,7 @@ or database control requests for stops; confirm actual worker/lock exit afterwar
 
 ## Local checkout after remote Git maintenance
 
-Use `/Users/pshorey/.agents/skills/pull-request-manage/SKILL.md` for relevant PR and
+Use `/Users/pshorey/.agents/skills/pr-management/SKILL.md` for relevant PR and
 branch maintenance. Reconcile `/Users/pshorey/git/map` after remote branch pushes,
 conflict repairs, merges, or superseded-PR closures. Updating a temporary coding
 worktree or remote-tracking refs alone does not synchronize the primary checkout.

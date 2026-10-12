@@ -100,6 +100,16 @@ class NativeLifecycle(unittest.TestCase):
         self.assertEqual(n.dispatch_plan('map',task)['thinking'],'high')
         self.assertNotIn('startingState',n.dispatch_plan('map',task)['target']['environment'])
 
+    def test_follow_up_grant_does_not_authorize_another_project(self):
+        statement = 'Human fixture: map coordinator may follow up within its own approved coding tasks.'
+        n.private_json(self.root / 'config/follow-up-authorization.json', {
+            'schema_version': 1, 'granted_by': 'Human fixture', 'granted_on': '2026-10-11',
+            'source_thread': ident(), 'projects': ['map'], 'statement': statement})
+        self.assertIn(statement, n.prompt('map'))
+        self.assertEqual(n.follow_up_authorization('another-project'), '')
+        (self.root / 'config/follow-up-authorization.json').unlink()
+        self.assertEqual(n.follow_up_authorization('map'), '')
+
     def test_worktree_must_be_clean_correct_base_and_linked(self):
         task=self.admitted()
         thread=ident()

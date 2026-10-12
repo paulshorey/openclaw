@@ -36,6 +36,7 @@ scheduled work. Review account, speed, permissions and notifications in the app.
 | --- | --- |
 | [config/projects.json](config/projects.json) | Reviewed repository/path/schedule inventory |
 | [config/agent-models.json](config/agent-models.json) | Independent coordinator and coding roles |
+| [config/follow-up-authorization.json](config/follow-up-authorization.json) | Paul's standing permission for scoped messages to coordinator-created tasks |
 | [config/coordinators/common.md](config/coordinators/common.md) | Claims, reconciliation, delegation and verification |
 | [config/coordinators/map.md](config/coordinators/map.md) | Map and continuous ingestion responsibilities |
 | [config/coordinators/livx.md](config/coordinators/livx.md), [notes.md](config/coordinators/notes.md) | Project-specific development responsibilities |
