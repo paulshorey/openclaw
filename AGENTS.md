@@ -1,27 +1,16 @@
-# Engineering instructions for Codex
+# Historical coordinator repository
 
-This repository develops and configures the local OpenClaw coordinator. This root `AGENTS.md` guides engineering agents. OpenClaw's operating instructions are versioned in `config/coordinator/` and deployed to the ignored `runtime/coordinator/` workspace.
+This checkout is retired from active operation. Native project automation is owned
+by Codex saved prompts. Native automation memory handoffs use the global skill at
+`/Users/pshorey/.agents/skills/automation-memory/SKILL.md`. Map's process controls
+and operating guide live in the map repository. Read README.md for their locations
+and review links.
 
-## Layout and workflow
+Preserve Git history and ignored runtime/logs/credentials. Do not commit private
+state, wipe historical evidence, restore the old service or reintroduce duplicate
+schedule/model/grant configuration here. Work on active helpers in their owning
+project/skill repository, following its instructions and Git review workflow.
 
-- `config/coordinator/*.template`: source for OpenClaw's injected `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, and `USER.md`, plus the on-demand `MAP-IMPORTS.md` procedure.
-- `config/heartbeat-prompt.txt`: scheduled coordinator prompt.
-- `config/managed-repositories.tsv`: reviewed GitHub/local checkout inventory; add future managed repositories here.
-- `runtime/coordinator/`: active OpenClaw workspace, with deployed instructions and private `state/`, `logs/`, and memory. Do not commit or wipe it.
-- `scripts/deploy-workspace.py`: deploy templates while preserving runtime data; refuses to overwrite a changed managed file.
-- `scripts/configure.sh`: applies settings and installs the LaunchAgent; it may start the Gateway.
-
-Edit the templates for coordinator behavior, deploy them, and validate OpenClaw config. Inspect the diff and run checks relevant to software changes. Preserve the Fireworks key in `~/.openclaw/.env` with mode `0600`; never put credentials in Git, prompts, or tool output. Keep the Gateway on loopback.
-
-Read `README.md` for the setup and file map. Keep operating rules in the coordinator templates, engineering rules here, project rules in each target repository's `AGENTS.md`, and run state in the ignored workspace. Update the README when the layout or operator procedure changes. The coordinator and `scripts/status.sh` read the managed-repository inventory from this checkout; review a repository's remote and instructions before adding it. Do not copy the README into an agent prompt.
-
-The configured OpenClaw workspace is `runtime/coordinator/`. Leave agent `cwd` unset so its default execution directory is that workspace. OpenClaw loads bootstrap files there. Codex may read this root file while engineering the repository; OpenClaw's own `AGENTS.md` comes from its nested workspace. Do not assume OpenClaw discovers parent instructions.
-
-For commands needing credentials from another project, use `.venv/bin/python scripts/project-env.py --cwd <project-or-app-path> -- <command>`. Choose the actual project or nested app path. `--shell-only` skips dotenv loading and is required for map. `--check` reports names and availability without values; `--require NAME` adds a required shell variable absent from dotenv files. Ordinary `git`, `rg`, and `gh` inspection does not need the runner. Respect the target repository's instructions. Examples:
-
-```sh
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/map --shell-only -- pnpm --filter @lib/db-map ingest:status
-.venv/bin/python scripts/project-env.py --cwd /Users/pshorey/git/livx -- pnpm --filter apps/client-app dev
-```
-
-Do not start OpenClaw for a documentation or template edit unless requested. The operator may intentionally leave it stopped.
+Use independent judgment, verify consequential assumptions and preserve human work.
+Ask when unresolved intent materially changes scope or consequences. This file guides
+maintenance of this archive and does not define an agent coordinator role.
